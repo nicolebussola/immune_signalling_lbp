@@ -16,20 +16,22 @@ TOOLTIPS = [
 MARKERS = ["hex", "x"]
 TISSUES = ["brain", "blood"]
 
-def interactive_embedding_blood_brain(adata, embedding, LABEL):
-    """plot interactive umap plot for scRNA data
+def interactive_embedding_blood_brain(adata, LABEL, embedding_method='umap'):
+    """plot interactive plot for scRNA data
 
     Args:
-        adata (AnnData): scanpy AnnData object. Must have the "tissue" (blood/brain) in .obs
-        embedding (np.array): embedding vectors obtain via DR, e.g. UMAP
+        adata (AnnData): scanpy AnnData object. Must have the "tissue" (blood/brain) in adata.obs
+        embedding_method (string): name of embedding vectors in adata.obsm, e.g. UMAP
         LABEL (str): target to color the points
 
     Returns:
         bokeh.plotting._figure.figure: interactive embedding plot colored by label
     """
-
+    print(LABEL)
     samples = np.array(list(adata.obs[LABEL].index))
     tissues = np.array(list(adata.obs["tissue"].values))
+    embedding = np.array(adata.obsm[f"X_{embedding_method}"].astype(float))
+
 
     p = figure(width=1200, height=1200, tooltips=TOOLTIPS, toolbar_location="left")
 
@@ -75,15 +77,18 @@ def interactive_embedding_blood_brain(adata, embedding, LABEL):
             palette=Viridis256, low=min(field), high=max(field)
         )
         smp = np.expand_dims(samples, axis=1)
-        data = np.hstack((embedding, smp, np.expand_dims(field, axis=1)))
-        df = pd.DataFrame(data, columns=["x", "y", "desc", "target"])
+        clas = np.expand_dims(tissues, axis=1)
+        data = np.hstack((embedding, smp, np.expand_dims(field, axis=1), clas))
+        df = pd.DataFrame(data, columns=["x", "y", "desc", "target", "tissue"])
         df["x"] = pd.to_numeric(df["x"])
         df["y"] = pd.to_numeric(df["y"])
         source = ColumnDataSource.from_df(data=df)
 
-        p.circle(
+        p.scatter(
             x="x",
             y="y",
+            marker=factor_mark("tissue", MARKERS, TISSUES),
+
             source=source,
             size=5,
             color={"field": "target", "transform": colormapper},
