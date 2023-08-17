@@ -1,10 +1,22 @@
 import numpy as np
 import pandas as pd
 from bokeh.layouts import column, layout, row
-from bokeh.models import (BoxZoomTool, CDSView, ColorBar, ColumnDataSource,
-                          CustomJS, CustomJSFilter, LassoSelectTool,
-                          LinearColorMapper, RangeSlider, ResetTool, Slider,
-                          WheelZoomTool, ZoomInTool)
+from bokeh.models import (
+    BoxZoomTool,
+    CDSView,
+    ColorBar,
+    ColumnDataSource,
+    CustomJS,
+    CustomJSFilter,
+    LassoSelectTool,
+    Legend,
+    LinearColorMapper,
+    RangeSlider,
+    ResetTool,
+    Slider,
+    WheelZoomTool,
+    ZoomInTool,
+)
 from bokeh.palettes import Viridis256
 from bokeh.plotting import figure
 from bokeh.transform import factor_mark
@@ -24,6 +36,8 @@ def QC_metrics_UMAP_plot(adata):
 
     samples = np.array(list(adata.obs["log1p_total_counts"].index))
     field_counts = adata.obs["log1p_total_counts"].values.astype(float)
+    field_ngenes = adata.obs["log1p_n_genes_by_counts"].values.astype(float)
+    field_pctcounts = adata.obs["pct_counts_in_top_20_genes"].values.astype(float)
     field_mt = adata.obs["pct_counts_mt"].values.astype(float)
     field_ribo = adata.obs["pct_counts_ribo"].values.astype(float)
     field_scdblfinder_score = adata.obs["scDblFinder_score"].values.astype(float)
@@ -43,6 +57,8 @@ def QC_metrics_UMAP_plot(adata):
             np.expand_dims(field_ribo, axis=1),
             np.expand_dims(field_scdblfinder_score, axis=1),
             np.expand_dims(field_scrublet_score, axis=1),
+            np.expand_dims(field_ngenes, axis=1),
+            np.expand_dims(field_pctcounts, axis=1),
         )
     )
 
@@ -57,6 +73,8 @@ def QC_metrics_UMAP_plot(adata):
             "value_pct_ribo",
             "scdblfinder_score",
             "scrublet_score",
+            "log1p_n_genes_by_counts",
+            "pct_counts_in_top_20_genes",
         ],
     )
 
@@ -82,8 +100,10 @@ def QC_metrics_UMAP_plot(adata):
         Counts <font face="Arial" size="2">@value_counts{0.2f} </font> <br> 
         Percent mito <font face="Arial" size="2">@value_pct_mt{0.2f} </font> <br> 
         Percent ribo <font face="Arial" size="2">@value_pct_ribo{0.2f} </font> <br> 
-        scdbl score <font face="Arial" size="2">@scdblfinder_score{0.2f} </font> <br> 
-        scrublet score <font face="Arial" size="2">@scrublet_score{0.2f} </font> <br> <br>
+        Scdbl score <font face="Arial" size="2">@scdblfinder_score{0.2f} </font> <br> 
+        Scrublet score <font face="Arial" size="2">@scrublet_score{0.2f} </font> <br> 
+        Number of genes with positive counts <font face="Arial" size="2">@log1p_n_genes_by_counts{0.2f} </font> <br>
+        Cumulative percentage of counts for 20 most expressed genes <font face="Arial" size="2">@pct_counts_in_top_20_genes{0.2f} </font> <br> <br>
     
     """
 
@@ -124,7 +144,20 @@ def QC_metrics_UMAP_plot(adata):
         step=0.1,
         title="scrublet score",
     )
-
+    slider_ngenes = RangeSlider(
+        start=min(field_ngenes),
+        end=max(field_ngenes),
+        value=(min(field_ngenes), max(field_ngenes)),
+        step=0.1,
+        title="N detected genes",
+    )
+    slider_pctcounts = RangeSlider(
+        start=min(field_pctcounts),
+        end=max(field_pctcounts),
+        value=(min(field_pctcounts), max(field_pctcounts)),
+        step=0.1,
+        title="Cumulative % counts top 20 genes",
+    )
     callback = CustomJS(
         args=dict(s=source),
         code="""
@@ -137,6 +170,8 @@ def QC_metrics_UMAP_plot(adata):
     slider_ribo.js_on_change("value", callback)
     slider_scdbl.js_on_change("value", callback)
     slider_scrublet.js_on_change("value", callback)
+    slider_ngenes.js_on_change("value", callback)
+    slider_pctcounts.js_on_change("value", callback)
 
     filt_counts = CustomJSFilter(
         args=dict(slider=slider_counts),
@@ -227,9 +262,53 @@ def QC_metrics_UMAP_plot(adata):
             """,
     )
 
+    filt_ngenes = CustomJSFilter(
+        args=dict(slider=slider_ngenes),
+        code="""
+            var indices = [];
+            var start = slider.value[0];
+            var end = slider.value[1];
+    
+            for (var i=0; i < source.get_length(); i++){
+                if (source.data['log1p_n_genes_by_counts'][i] >= start && source.data['log1p_n_genes_by_counts'][i] <= end){
+                    indices.push(true);
+                } else {
+                    indices.push(false);
+                }
+            }
+            return indices;
+            """,
+    )
+
+    filt_pctcounts = CustomJSFilter(
+        args=dict(slider=slider_pctcounts),
+        code="""
+            var indices = [];
+            var start = slider.value[0];
+            var end = slider.value[1];
+    
+            for (var i=0; i < source.get_length(); i++){
+                if (source.data['pct_counts_in_top_20_genes'][i] >= start && source.data['pct_counts_in_top_20_genes'][i] <= end){
+                    indices.push(true);
+                } else {
+                    indices.push(false);
+                }
+            }
+            return indices;
+            """,
+    )
+
     view = CDSView(
         source=source,
-        filters=[filt_counts, filt_mt, filt_ribo, filt_scdbl, filt_scrublet],
+        filters=[
+            filt_counts,
+            filt_mt,
+            filt_ribo,
+            filt_scdbl,
+            filt_scrublet,
+            filt_ngenes,
+            filt_pctcounts,
+        ],
     )
     # view_mt = CDSView(source=source, filters=[filt_mt])
 
@@ -248,13 +327,19 @@ def QC_metrics_UMAP_plot(adata):
     # Adding the color bar to the right side
     p.add_layout(cb, "right")
 
-    return(
-        row(
-            p,
-            column(
-                slider_counts, slider_mt, slider_ribo, slider_scdbl, slider_scrublet
-            ),
-        )
+    return row(
+        p,
+        column(
+            slider_counts,
+            slider_ngenes,
+            slider_pctcounts,
+            slider_mt,
+            slider_ribo,
+            slider_scdbl,
+            slider_scrublet,
+            slider_ngenes,
+            slider_pctcounts,
+        ),
     )
 
 
@@ -308,8 +393,12 @@ def interactive_embedding_blood_brain(adata, LABEL, embedding_method="umap"):
                 alpha=0.8,
                 legend_label=theclass,
             )
-            p.legend.location = "top_left"
+            # p.legend.location = "top_left"
             p.legend.click_policy = "hide"
+            legend = p.legend[0]
+
+        p.add_layout(legend, "right")
+        p.width = 1000
 
     # continuous label
     else:
@@ -344,6 +433,7 @@ def interactive_embedding_blood_brain(adata, LABEL, embedding_method="umap"):
     p.add_tools(ZoomInTool())
     p.add_tools(ResetTool())
     p.add_tools(BoxZoomTool())
+
     return p
 
 
@@ -358,7 +448,6 @@ def interactive_embedding(adata, LABEL, embedding_method="umap"):
     Returns:
         bokeh.plotting._figure.figure: interactive embedding plot colored by label
     """
-    print(LABEL)
     samples = np.array(list(adata.obs[LABEL].index))
     embedding = np.array(adata.obsm[f"X_{embedding_method}"].astype(float))
 
@@ -407,9 +496,12 @@ def interactive_embedding(adata, LABEL, embedding_method="umap"):
                 alpha=0.8,
                 legend_label=theclass,
             )
-            p.legend.location = "top_left"
+            # p.legend.location = "top_left"
             p.legend.click_policy = "hide"
+            legend = p.legend[0]
 
+        p.add_layout(legend, "right")
+        p.width = 1000
         return p
 
     # continuous label
