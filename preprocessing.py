@@ -6,13 +6,8 @@ import numpy as np
 import pandas as pd
 import rpy2.robjects as ro
 import scanpy as sc
-import scipy.sparse
-import scrublet as scr
-import seaborn as sns
-from bokeh.models import ColorBar, TabPanel, Tabs
-from bokeh.plotting import output_file, output_notebook, show
-
-# import rpy2.rinterfaceib.callbacks as rcb
+from bokeh.models import TabPanel, Tabs
+from bokeh.plotting import output_file, show
 from rpy2.robjects.packages import importr
 from scipy.stats import median_abs_deviation
 
@@ -22,12 +17,19 @@ sc.settings.verbosity = 0
 
 anndata2ri.activate()
 
+
+def is_outlier(adata, metric: str, nmads: int):
+    M = adata.obs[metric]
+    outlier = (M < np.median(M) - nmads * median_abs_deviation(M)) | (
+        np.median(M) + nmads * median_abs_deviation(M) < M
+    )
+    return outlier
+
+
 np.random.seed(42)
 
 BATCH = 1
 tissue = "blood"
-# PT = "PT-212"
-# side = "R"
 
 if BATCH == 1:
     batch_path = Path("../LBP_brain_blood_pairs/data/narsad_cellRanger_outs/")
@@ -36,15 +38,15 @@ else:
 
 
 for PT in [
-    "PT-182",
-    "PT-185",
-    "PT-201",
-    "PT-203",
-    "PT-205",
-    "PT-206",
+    # "PT-182",
+    # "PT-185",
+    # "PT-201",
+    # "PT-203",
+    # "PT-205",
+    # "PT-206",
     "PT-208",
-    "PT-212",
-    "PT-214",
+    # "PT-212",
+    # "PT-214",
 ]:
     for side in ["R", "L"]:
         try:
@@ -69,9 +71,25 @@ for PT in [
 
             adata.var_names_make_unique()
 
+            ############## Read ddqc output csv
+            ddqc_obs = pd.read_csv(
+                batch_path
+                / tissue
+                / f"{PT}-blood-{side}"
+                / f"{PT}-{side}-B_CellBender_filtered_ddqc.csv"
+            )
+            ddqc_obs = ddqc_obs.set_index("barcodekey")
+            ddqc_obs.index.name = None
+
+            print("\n======================")
+            print("ddqc shape:\n")
+            print(len(ddqc_obs.index))
+            print("======================\n")
+
             ############## Basic Filtering
             sc.pp.filter_genes(adata, min_cells=3)
             sc.pp.filter_cells(adata, min_genes=200)
+
             # Remove MALAT1
             malat1 = adata.var_names.str.startswith("MALAT1")
             keep = np.invert(malat1)
@@ -95,13 +113,6 @@ for PT in [
             )
 
             ############ MADs outliers
-            def is_outlier(adata, metric: str, nmads: int):
-                M = adata.obs[metric]
-                outlier = (M < np.median(M) - nmads * median_abs_deviation(M)) | (
-                    np.median(M) + nmads * median_abs_deviation(M) < M
-                )
-                return outlier
-
             adata.obs["outlier"] = (
                 is_outlier(adata, "log1p_total_counts", 2)
                 | is_outlier(adata, "log1p_n_genes_by_counts", 2)
@@ -128,7 +139,7 @@ for PT in [
                 sce = scDblFinder(
                     SingleCellExperiment(
                         list(counts=data_mat),
-                    ) 
+                    )
                 )
                 doublet_score = sce$scDblFinder.score
                 doublet_class = sce$scDblFinder.class
@@ -171,7 +182,7 @@ for PT in [
                     """
             )
             binomial_deviance = ro.r("rowData(sce)$binomial_deviance").T
-            idx = binomial_deviance.argsort()[-4000:]
+            idx = binomial_deviance.argsort()[-2000:]
             mask = np.zeros(adata.var_names.shape, dtype=bool)
             mask[idx] = True
 
@@ -186,7 +197,6 @@ for PT in [
             adata.layers["log1p_norm"] = sc.pp.log1p(scales_counts["X"], copy=True)
 
             adata.X = adata.layers["log1p_norm"]
-
             ############## Plots
             adata.obs["scDblFinder_class"] = adata.obs["scDblFinder_class"].astype(
                 "str"
@@ -203,6 +213,14 @@ for PT in [
             # sc.tl.umap(adata_deviance, init_pos='paga')
             sc.tl.umap(adata)
 
+            adata.obs.index = [s.split("-")[0] for s in list(adata.obs.index)]
+            adata = adata[
+                ~adata.obs.index.isin(
+                    list(set(adata.obs.index) - (set(ddqc_obs.index)))
+                )
+            ].copy()  # cells do not coincide?
+            adata.obs = pd.merge(adata.obs, ddqc_obs, left_index=True, right_index=True)
+
             p = QC_metrics_UMAP_plot(adata)
 
             output_file(
@@ -210,19 +228,26 @@ for PT in [
             )
 
             show(p)
+
             adata.obs["outlier"] = adata.obs["outlier"].astype("object")
+            adata.obs["cluster_labels"] = adata.obs["cluster_labels"].astype("str")
+            adata.obs["passed_qc"] = adata.obs["passed_qc"].astype("str")
 
             labels = [
                 "log1p_total_counts",
+                "log1p_n_genes_by_counts",
+                "pct_counts_in_top_20_genes",
                 "outlier",
                 "pct_counts_mt",
                 "pct_counts_ribo",
-                "pct_counts_hb",
                 "scDblFinder_score",
                 "doublet_scores_scrublet",
                 "scDblFinder_class",
                 "predicted_doublets_scrublet",
+                "cluster_labels",
+                "passed_qc",
             ]
+
             sc.pl.umap(adata, color=labels)
 
             tabs = []
@@ -237,8 +262,6 @@ for PT in [
                 f"../LBP_brain_blood_pairs/PLOTS/QC_plots/{PT}-{tissue}-{side}_cellbender_QC.html"
             )
             show(p)
-
-            # adata_filtered = adata[(adata.obs['predicted_doublets_scrublet'] == 'False') & (v.obs['pct_counts_mt']<20)].copy()
 
             adata.obs["side"] = side
             adata.obs["outlier"] = adata.obs["outlier"].astype("str")

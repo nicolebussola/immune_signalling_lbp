@@ -1,8 +1,6 @@
-import os
 from pathlib import Path
 
 import ddqc
-import pandas as pd
 import pegasus as pg
 import pegasusio as io
 
@@ -17,15 +15,15 @@ else:
 
 
 for PT in [
-    "PT-182",
-    "PT-185",
-    "PT-201",
+    # "PT-182",
+    # "PT-185",
+    # "PT-201",
     "PT-203",
-    "PT-205",
-    "PT-206",
-    "PT-208",
-    "PT-212",
-    "PT-214",
+    # "PT-205",
+    # "PT-206",
+    # "PT-208",
+    # "PT-212",
+    # "PT-214",
 ]:
     for side in ["R", "L"]:
         try:
@@ -43,15 +41,13 @@ for PT in [
                 adata,
                 return_df_qc=True,
                 display_plots=False,
+                basic_n_genes=200,
                 ribo_prefix="^RP[SL]|^RPLP|^RPSA",
             )
             pg.filter_data(adata)
 
             print(adata.shape)
-            #h5_out_name = os.path.splitext(h5_name)[0] + "_ddqc.h5"
-            # pg.write_output(
-            #     adata, batch_path / tissue / f"{PT}-{tissue}-{side}" / h5_out_name
-            # )
+
             data_qc.to_csv(
                 batch_path
                 / tissue

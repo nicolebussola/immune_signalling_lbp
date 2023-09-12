@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from bokeh.layouts import column, layout, row
+from bokeh.layouts import column, grid, layout, row
 from bokeh.models import (
     BoxZoomTool,
     CDSView,
@@ -9,16 +9,14 @@ from bokeh.models import (
     CustomJS,
     CustomJSFilter,
     LassoSelectTool,
-    Legend,
     LinearColorMapper,
     RangeSlider,
     ResetTool,
-    Slider,
     WheelZoomTool,
     ZoomInTool,
 )
 from bokeh.palettes import Viridis256
-from bokeh.plotting import figure
+from bokeh.plotting import figure, output_file, show
 from bokeh.transform import factor_mark
 
 TOOLTIPS = [
@@ -97,14 +95,14 @@ def QC_metrics_UMAP_plot(adata):
         Sample name <strong>@desc</strong> <br>
         Index: $index <br>
         Coordinates: ($x, $y)<br>
-        Counts <font face="Arial" size="2">@value_counts{0.2f} </font> <br> 
-        Percent mito <font face="Arial" size="2">@value_pct_mt{0.2f} </font> <br> 
-        Percent ribo <font face="Arial" size="2">@value_pct_ribo{0.2f} </font> <br> 
-        Scdbl score <font face="Arial" size="2">@scdblfinder_score{0.2f} </font> <br> 
+        Counts <font face="Arial" size="2">@value_counts{0.2f} </font> <br>
+        Percent mito <font face="Arial" size="2">@value_pct_mt{0.2f} </font> <br>
+        Percent ribo <font face="Arial" size="2">@value_pct_ribo{0.2f} </font> <br>
+        Scdbl score <font face="Arial" size="2">@scdblfinder_score{0.2f} </font> <br>
         Scrublet score <font face="Arial" size="2">@scrublet_score{0.2f} </font> <br> 
         Number of genes with positive counts <font face="Arial" size="2">@log1p_n_genes_by_counts{0.2f} </font> <br>
         Cumulative percentage of counts for 20 most expressed genes <font face="Arial" size="2">@pct_counts_in_top_20_genes{0.2f} </font> <br> <br>
-    
+  
     """
 
     source = ColumnDataSource(data=df)
@@ -232,7 +230,7 @@ def QC_metrics_UMAP_plot(adata):
             var indices = [];
             var start = slider.value[0];
             var end = slider.value[1];
-    
+
             for (var i=0; i < source.get_length(); i++){
                 if (source.data['scdblfinder_score'][i] >= start && source.data['scdblfinder_score'][i] <= end){
                     indices.push(true);
@@ -437,7 +435,7 @@ def interactive_embedding_blood_brain(adata, LABEL, embedding_method="umap"):
     return p
 
 
-def interactive_embedding(adata, LABEL, embedding_method="umap"):
+def interactive_embedding(adata, LABEL, embedding_method="umap", width=900, height=900):
     """plot interactive plot for scRNA data
 
     Args:
@@ -451,7 +449,13 @@ def interactive_embedding(adata, LABEL, embedding_method="umap"):
     samples = np.array(list(adata.obs[LABEL].index))
     embedding = np.array(adata.obsm[f"X_{embedding_method}"].astype(float))
 
-    p = figure(width=900, height=900, tooltips=TOOLTIPS, toolbar_location="left")
+    p = figure(
+        title=LABEL,
+        width=width,
+        height=height,
+        tooltips=TOOLTIPS,
+        toolbar_location="left",
+    )
 
     p.title.align = "center"
     p.title.text_color = "black"
@@ -501,7 +505,7 @@ def interactive_embedding(adata, LABEL, embedding_method="umap"):
             legend = p.legend[0]
 
         p.add_layout(legend, "right")
-        p.width = 1000
+        # p.width = width+100
         return p
 
     # continuous label
@@ -573,3 +577,15 @@ def interactive_embedding(adata, LABEL, embedding_method="umap"):
         p.add_layout(cb, "right")
         lay = layout([slider, p])
         return lay
+
+
+def gridlayout(labels, adata, fname=None):
+    ps = []
+    for label in labels:
+        p = interactive_embedding(adata, label, width=800, height=700)
+        ps.append(p)
+
+    if fname is not None:
+        output_file(fname)
+
+    show(grid(ps, ncols=3))
