@@ -423,5 +423,5 @@ for method in [adata_harmony, adata_scvi]:
         legend_loc="on data",
     )
 
-# adata_harmony.write(project_path / "data" / "blood_harmony_clustered.h5ad")
-# adata_scvi.write(project_path / "data" / "blood_scvi_clustered.h5ad")
+adata_harmony.write(project_path / "data" / "blood_4000chem_harmony_clustered.h5ad")
+adata_scvi.write(project_path / "data" / "blood_4000chem_scvi_clustered.h5ad")
