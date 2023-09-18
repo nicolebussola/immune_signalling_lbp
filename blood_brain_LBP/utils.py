@@ -11,13 +11,13 @@ from bokeh.models import (
     ColumnDataSource,
     CustomJS,
     CustomJSFilter,
+    Label,
     LassoSelectTool,
     LinearColorMapper,
     RangeSlider,
     ResetTool,
     WheelZoomTool,
     ZoomInTool,
-    Label,
 )
 from bokeh.palettes import Viridis256
 from bokeh.plotting import figure, output_file, show
@@ -393,9 +393,7 @@ def interactive_embedding_blood_brain(adata, LABEL, embedding_method="umap"):
 
             data = np.hstack(
                 (
-                    embedding[
-                        idx,
-                    ],
+                    embedding[idx,],
                     smp,
                     clas,
                 )
@@ -509,9 +507,7 @@ def interactive_embedding(
 
             data = np.hstack(
                 (
-                    embedding[
-                        idx,
-                    ],
+                    embedding[idx,],
                     smp,
                 )
             )
