@@ -10,7 +10,6 @@ from bokeh.models import TabPanel, Tabs
 from bokeh.plotting import output_file, show
 from rpy2.robjects.packages import importr
 from scipy.stats import median_abs_deviation
-
 from utils import QC_metrics_UMAP_plot, interactive_embedding
 
 LABELS = [
