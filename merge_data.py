@@ -14,7 +14,7 @@ import scvi
 from rpy2.robjects.packages import importr
 from scipy.sparse import csr_matrix, issparse
 
-from utils import gridlayout
+from notebooks.utils import gridlayout
 
 anndata2ri.activate()
 warnings.filterwarnings("ignore")
@@ -90,11 +90,11 @@ sc.tl.umap(adata_log1p)
 sc.pl.umap(adata_log1p, color=labels, show=False, return_fig=False)
 
 # Plot and save merged data
-gridlayout(
-    labels,
-    adata_log1p,
-    project_path / "PLOTS" / "QC_plots" / "merged_blood_cellbender_QC.html",
-)
+# gridlayout(
+#     labels,
+#     adata_log1p,
+#     fname = project_path / "PLOTS" / "QC_plots" / "merged_blood_cellbender_QC.html",
+# )
 
 print("\n##########\n Data Filtering\n##########\n")
 
@@ -128,11 +128,11 @@ sc.tl.umap(adata_filtered)
 sc.pl.umap(adata_filtered, color=labels)
 
 # Plot and save filtered data
-gridlayout(
-    filtered_labels,
-    adata_filtered,
-    project_path / "PLOTS" / "QC_plots" / "merged_blood_cellbender_QC_filtered.html",
-)
+# gridlayout(
+#     filtered_labels,
+#     adata_filtered,
+#     fname = project_path / "PLOTS" / "QC_plots" / "merged_blood_cellbender_QC_filtered.html",
+# )
 
 print("\n##########\n Data Normalization\n##########\n")
 print("Scran normalization")
@@ -157,7 +157,7 @@ if issparse(data_mat):
 
     else:
         data_mat = data_mat.tocsc()
-# ro.globalenv["data_mat"] = data_mat
+
 ro.globalenv["input_groups"] = adata_pp.obs["groups"]
 
 del adata_pp
@@ -190,14 +190,36 @@ adata_filtered.layers["analytic_pearson_residuals"] = csr_matrix(analytic_pearso
 
 print("\n##########\n Feature selection\n##########\n")
 
+method = "HighlyDeviant"
 n_genes = 4000
 batch_key = "chemistry"
 flavor = "cell_ranger"
 
-print(f"Compute n={n_genes} top genes with flavor {flavor} and batch={batch_key}")
-sc.pp.highly_variable_genes(
-    adata_filtered, n_top_genes=n_genes, flavor=flavor, batch_key="chemistry"
-)
+print(f"Compute n={n_genes} top genes with {method} approach")
+
+if method == "cell_ranger":
+    batch_key = "chemistry"
+    flavor = "cell_ranger"
+    sc.pp.highly_variable_genes(
+        adata_filtered, n_top_genes=n_genes, flavor=flavor, batch_key="chemistry"
+    )
+elif method == "HighlyDeviant":
+    importr("scry")
+    deviance_feat_sel = ro.r(
+        """
+    f <- function(adata_filtered){
+    devianceFeatureSelection(adata_filtered, assay="X")
+    }
+    """
+    )
+    sce = deviance_feat_sel(adata_filtered)
+    binomial_deviance = ro.r("rowData(sce)$binomial_deviance").T
+    idx = binomial_deviance.argsort()[-n_genes:]
+    mask = np.zeros(adata_filtered.var_names.shape, dtype=bool)
+    mask[idx] = True
+    adata_filtered.var["highly_deviant"] = mask
+    adata_filtered.var["binomial_deviance"] = binomial_deviance
+    adata_filtered.var["highly_variable"] = adata_filtered.var["highly_deviant"]
 
 adata_hvg = adata_filtered[:, adata_filtered.var["highly_variable"]].copy()
 adata_hvg.X = adata_hvg.layers["counts"].copy()
@@ -212,10 +234,10 @@ sc.pl.umap(adata_hvg, color=filtered_labels)
 gridlayout(
     filtered_labels,
     adata_hvg,
-    project_path
+    fname=project_path
     / "PLOTS"
     / "QC_plots"
-    / "merged_blood_cellbender_QC_filtered_4000chem.html",
+    / f"merged_blood_cellbender_QC_filtered_{n_genes}{method}.html",
 )
 
 
@@ -257,10 +279,10 @@ sc.tl.umap(adata_harmony)
 gridlayout(
     labels,
     adata_harmony,
-    project_path
+    fname=project_path
     / "PLOTS"
     / "QC_plots"
-    / "merged_blood_cellbender_QC_filtered_4000chem_harmonyChemPtSide.html",
+    / f"merged_blood_cellbender_QC_filtered_{n_genes}{method}_harmonyChemPtSide.html",
 )
 
 print("\nScVI integration")
@@ -284,10 +306,10 @@ sc.pl.umap(adata_scvi, color=labels, wspace=1)
 gridlayout(
     labels,
     adata_scvi,
-    project_path
+    fname=project_path
     / "PLOTS"
     / "QC_plots"
-    / "merged_blood_cellbender_QC_filtered_4000chem_scvi.html",
+    / f"merged_blood_cellbender_QC_filtered_{n_genes}{method}_scvi.html",
 )
 
 
@@ -402,7 +424,7 @@ for method, metrics_list in metrics_dict.items():
 df = df.T
 df.columns = ["chemistry", "pt", "side"]
 df.style.background_gradient(cmap="Blues")
-df.to_csv(project_path / "blood_integration_comparison.csv")
+df.to_csv(project_path / f"blood_{n_genes}{method}_integration_comparison.csv")
 
 print("\n##########\n Leiden clustering and saving\n##########\n")
 for method in [adata_harmony, adata_scvi]:
@@ -423,5 +445,7 @@ for method in [adata_harmony, adata_scvi]:
         legend_loc="on data",
     )
 
-adata_harmony.write(project_path / "data" / "blood_4000chem_harmony_clustered.h5ad")
-adata_scvi.write(project_path / "data" / "blood_4000chem_scvi_clustered.h5ad")
+adata_harmony.write(
+    project_path / "data" / f"blood_{n_genes}{method}_harmony_clustered.h5ad"
+)
+adata_scvi.write(project_path / "data" / f"blood_{n_genes}{method}_scvi_clustered.h5ad")

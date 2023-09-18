@@ -13,9 +13,30 @@ from scipy.stats import median_abs_deviation
 
 from utils import QC_metrics_UMAP_plot, interactive_embedding
 
+LABELS = [
+    "log1p_total_counts",
+    "log1p_n_genes_by_counts",
+    "pct_counts_in_top_20_genes",
+    "outlier",
+    "pct_counts_mt",
+    "pct_counts_ribo",
+    "scDblFinder_score",
+    "doublet_scores_scrublet",
+    "scDblFinder_class",
+    "predicted_doublets_scrublet",
+    "cluster_labels",
+    "passed_qc",
+]
+
 sc.settings.verbosity = 0
 
 anndata2ri.activate()
+importr("Seurat")
+
+importr("scater")
+importr("scDblFinder")
+importr("BiocParallel")
+importr("scry")
 
 
 def is_outlier(adata, metric: str, nmads: int):
@@ -28,15 +49,12 @@ def is_outlier(adata, metric: str, nmads: int):
 
 np.random.seed(42)
 
-BATCH = 1
+## Batch 1 ==> narsad_cellRanger_outs
+## Batch 2
 tissue = "blood"
+batch_path = Path("../LBP_brain_blood_pairs/data/narsad_cellRanger_outs/")
 
-if BATCH == 1:
-    batch_path = Path("../LBP_brain_blood_pairs/data/narsad_cellRanger_outs/")
-else:
-    batch_path = Path()
-
-
+## tutto il for in una funzione da chimare nel main con argparse
 for PT in [
     # "PT-182",
     # "PT-185",
@@ -124,14 +142,7 @@ for PT in [
             print("======================\n")
 
             ############ Doublet detection
-            importr("Seurat")
-
-            importr("scater")
-            importr("scDblFinder")
-            importr("BiocParallel")
-
             data_mat = adata.X.T.copy()
-            ro.globalenv["data_mat"] = data_mat
 
             scdblfinder = ro.r(
                 """
@@ -174,12 +185,10 @@ for PT in [
             print("======================\n")
 
             ############ Feature selection
-            ro.globalenv["adata"] = adata
-            importr("scry")
             ro.r(
                 """
                 sce = devianceFeatureSelection(adata, assay="X")
-                    """
+                """
             )
             binomial_deviance = ro.r("rowData(sce)$binomial_deviance").T
             idx = binomial_deviance.argsort()[-2000:]
@@ -233,29 +242,12 @@ for PT in [
             adata.obs["cluster_labels"] = adata.obs["cluster_labels"].astype("str")
             adata.obs["passed_qc"] = adata.obs["passed_qc"].astype("str")
 
-            labels = [
-                "log1p_total_counts",
-                "log1p_n_genes_by_counts",
-                "pct_counts_in_top_20_genes",
-                "outlier",
-                "pct_counts_mt",
-                "pct_counts_ribo",
-                "scDblFinder_score",
-                "doublet_scores_scrublet",
-                "scDblFinder_class",
-                "predicted_doublets_scrublet",
-                "cluster_labels",
-                "passed_qc",
+            sc.pl.umap(adata, color=LABELS)
+
+            tabs = [
+                TabPanel(child=interactive_embedding(adata, label), title=label)
+                for label in LABELS
             ]
-
-            sc.pl.umap(adata, color=labels)
-
-            tabs = []
-
-            for label in labels:
-                tabs.append(
-                    TabPanel(child=interactive_embedding(adata, label), title=label)
-                )
 
             p = Tabs(tabs=tabs)
             output_file(
@@ -269,3 +261,7 @@ for PT in [
             adata.write(batch_path / tissue / f"{PT}-{tissue}-{side}_QC.h5ad")
         except Exception as e:
             print(e)
+
+
+##### Add main and argparse
+#### --tissue --input_dir --output_dir

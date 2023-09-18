@@ -14,6 +14,7 @@ from bokeh.models import (
     ResetTool,
     WheelZoomTool,
     ZoomInTool,
+    Label,
 )
 from bokeh.palettes import Viridis256
 from bokeh.plotting import figure, output_file, show
@@ -435,7 +436,9 @@ def interactive_embedding_blood_brain(adata, LABEL, embedding_method="umap"):
     return p
 
 
-def interactive_embedding(adata, LABEL, embedding_method="umap", width=900, height=900):
+def interactive_embedding(
+    adata, LABEL, embedding_method="umap", width=900, height=900, labels_loc="outside"
+):
     """plot interactive plot for scRNA data
 
     Args:
@@ -470,8 +473,11 @@ def interactive_embedding(adata, LABEL, embedding_method="umap", width=900, heig
     # categorical label
     if f"{LABEL}_colors" in list(adata.uns.keys()):
         mycols = adata.uns[f"{LABEL}_colors"]
-        myclasses = pd.unique(adata.obs[LABEL])
 
+        try:
+            myclasses = sorted(pd.unique(adata.obs[LABEL]), key=int)
+        except ValueError:
+            myclasses = pd.unique(adata.obs[LABEL])
         for col, theclass in zip(mycols, myclasses):
             idx = np.where(np.array(list(adata.obs[LABEL])) == str(theclass))[
                 0
@@ -503,6 +509,15 @@ def interactive_embedding(adata, LABEL, embedding_method="umap", width=900, heig
             # p.legend.location = "top_left"
             p.legend.click_policy = "hide"
             legend = p.legend[0]
+            if labels_loc == "on_data":
+                centroid_x = np.mean(df["x"], axis=0)
+                centroid_y = np.mean(df["y"], axis=0)
+
+                labels = Label(x=centroid_x, y=centroid_y, text=theclass)
+                labels.text_font_style = "bold"
+
+                # Add the labels to the plot
+                p.add_layout(labels)
 
         p.add_layout(legend, "right")
         # p.width = width+100
@@ -579,13 +594,17 @@ def interactive_embedding(adata, LABEL, embedding_method="umap", width=900, heig
         return lay
 
 
-def gridlayout(labels, adata, fname=None):
+def gridlayout(
+    labels, adata, width=800, height=700, ncols=3, fname=None, labels_loc="outside"
+):
     ps = []
     for label in labels:
-        p = interactive_embedding(adata, label, width=800, height=700)
+        p = interactive_embedding(
+            adata, label, width=width, height=height, labels_loc=labels_loc
+        )
         ps.append(p)
 
     if fname is not None:
         output_file(fname)
 
-    show(grid(ps, ncols=3))
+    show(grid(ps, ncols=ncols))
