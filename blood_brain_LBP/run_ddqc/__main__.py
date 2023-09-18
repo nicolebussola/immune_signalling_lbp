@@ -2,11 +2,12 @@ import argparse
 from pathlib import Path
 
 from ..utils import readable_directory
+
 # from .run_ddqc import run_ddqc
 
 
 def get_parser():
-    """Returns the parser for all the args for run_ddqc function use via script/cli."""
+    """Returns the parser for all the args for run_ddqc function used via script/cli."""
     parser = argparse.ArgumentParser(prog="run_ddqc")
     parser.add_argument(
         "--input-path",
@@ -25,7 +26,9 @@ def get_parser():
     parser.add_argument(
         "--tissue",
         "-t",
-        choices=["blood",],
+        choices=[
+            "blood",
+        ],
         type=str,
         default="blood",
         help="Type of tissue, default: blood.",
