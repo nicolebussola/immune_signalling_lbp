@@ -20,3 +20,16 @@
 > we use our genotype-based estimates to evaluate the performance of three methods (CellBender, DecontX, SoupX) that are designed to quantify and remove background noise. We fnd that CellBender provides the most precise estimates of background noise levels and also yields the highest improvement for marker gene detection. By contrast, clustering and classifcation of cells are fairly robust towards background noise and only small improvements can be achieved by background removal that may come at the cost of distortions in fne structure.
 
 <a name="cite_note-2"></a>2. [^](#cite_ref-2) Germain P.L., pipeComp, a general framework for the evaluation of computational pipelines, reveals performant single cell rna-seq preprocessing tools. *Genome Biology* (September 2020)
+
+## Usage
+
+### Run ddqc
+
+```bash
+python -m blood_brain_LBP.run_ddqc [-h] [--input-path INPUT_PATH] [--output-path OUTPUT_PATH] [--tissue {blood}]
+```
+
+Example:
+```bash
+python -m blood_brain_LBP.run_ddqc -i /Users/myuser -o /Users/myuser/out -t blood
+```
