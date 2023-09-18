@@ -1,4 +1,4 @@
-t_cell_markers = {
+T_CELL_MARKERS = {
     "Regulatory T cells (Tregs)": ["FOXP3"],
     "Naive CD4+ T cells": ["CCR7", "CD45RA"],
     "Central Memory CD4+ T cells": ["CCR7", "CD45RO"],
@@ -15,7 +15,7 @@ t_cell_markers = {
     "Th2 cells": ["IL4", "IL5", "IL13", "GATA3"],
 }
 
-b_cell_markers = {
+B_CELL_MARKERS = {
     "Naive B cells": {
         "CD19": "B cell surface marker",
         "CD27": "Not expressed on naive B cells",
@@ -48,7 +48,7 @@ b_cell_markers = {
     },
 }
 
-immune_cell_markers = {
+IMMUNE_CELL_MARKERS = {
     "B cells": {
         "Naive B cells": ["CD19", "CD27", "CD24"],
         "Memory B cells": ["CD19", "CD27", "CD20"],
