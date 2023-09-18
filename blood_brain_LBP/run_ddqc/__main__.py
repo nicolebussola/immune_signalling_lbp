@@ -2,7 +2,6 @@ import argparse
 from pathlib import Path
 
 from ..utils import readable_directory
-
 from .run_ddqc import run_ddqc
 
 
@@ -14,14 +13,14 @@ def get_parser():
         "-i",
         action=readable_directory,
         default=Path(),
-        help="Input path of the directory that contains ...",  # TODO: expand help
+        help="Path of the directory that contains cellranger outputs (h5) for each sample.",
     )
     parser.add_argument(
         "--output-path",
         "-o",
         action=readable_directory,
         default=Path(),
-        help="Output path: where to store the results.",
+        help="Output path: where to store the resulting csv with ddqc metrics.",
     )
     parser.add_argument(
         "--tissue",
@@ -31,7 +30,7 @@ def get_parser():
         ],
         type=str,
         default="blood",
-        help="Type of tissue, default: blood.",
+        help="Type of tissue (brain or blood), default: blood.",
     )
     return parser
 

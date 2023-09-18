@@ -1,29 +1,34 @@
+import datetime
 import logging
+import os
 
 import ddqc
+import pandas as pd
 import pegasusio as io
 
+logging.getLogger().setLevel(logging.INFO)
 logging.basicConfig(format="%(asctime)s - %(message)s", datefmt="%d-%b-%y %H:%M:%S")
+
+timestamp = datetime.datetime.now().strftime("%m%d")
 
 
 def run_ddqc(input_path, output_path, tissue):
-    for PT in [
-        "PT-182",
-        "PT-185",
-        "PT-201",
-        "PT-203",
-        "PT-205",
-        "PT-206",
-        "PT-208",
-        "PT-212",
-        "PT-214",
-    ]:
+    data_path = input_path / tissue
+    patients = pd.unique(
+        [
+            "PT-" + p.split("-")[1]
+            for p in os.listdir(data_path)
+            if os.path.isdir(data_path / p)
+        ]
+    )
+    logging.info(f"Patients found ({len(patients)}): {patients}")
+    for PT in patients:
         for side in ["R", "L"]:
             try:
                 prefix = "B_" if tissue == "blood" else ""
                 h5_name = f"{PT}-{side}-{prefix}CellBender_filtered.h5"
                 adata = io.read_input(
-                    input_path / tissue / f"{PT}-{tissue}-{side}" / h5_name,
+                    data_path / f"{PT}-{tissue}-{side}" / h5_name,
                     genome="hg38",
                 )
                 logging.info(f"adata shape before metrics: {adata.shape}")
@@ -39,7 +44,7 @@ def run_ddqc(input_path, output_path, tissue):
                     output_path
                     / tissue
                     / f"{PT}-{tissue}-{side}"
-                    / f"{PT}-{side}-{prefix}CellBender_filtered_ddqc.csv"
+                    / f"{PT}-{side}-{prefix}CellBender_filtered_ddqc_{timestamp}.csv"
                 )
             except Exception as e:
                 logging.error(e)
