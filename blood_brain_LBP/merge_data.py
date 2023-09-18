@@ -14,7 +14,7 @@ import scvi
 from rpy2.robjects.packages import importr
 from scipy.sparse import csr_matrix, issparse
 
-from notebooks.utils import gridlayout
+from .utils import gridlayout
 
 anndata2ri.activate()
 warnings.filterwarnings("ignore")
