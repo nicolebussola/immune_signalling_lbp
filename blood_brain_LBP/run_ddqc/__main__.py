@@ -3,7 +3,7 @@ from pathlib import Path
 
 from ..utils import readable_directory
 
-# from .run_ddqc import run_ddqc
+from .run_ddqc import run_ddqc
 
 
 def get_parser():
@@ -39,8 +39,8 @@ def get_parser():
 if __name__ == "__main__":
     parser = get_parser()
     args = parser.parse_args()
-    # run_ddqc(
-    #     input_path=Path(args.input_path),
-    #     output_path=Path(args.output_path),
-    #     tissue=args.tissue,
-    # )
+    run_ddqc(
+        input_path=Path(args.input_path),
+        output_path=Path(args.output_path),
+        tissue=args.tissue,
+    )
