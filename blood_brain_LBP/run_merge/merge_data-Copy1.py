@@ -164,7 +164,7 @@ del adata_pp
 
 size_factors = ro.r(
     """
-    f <- function(data_mat){sizeFactors(
+    f <- function(data_mat, input_groups){sizeFactors(
     computeSumFactors(
         SingleCellExperiment(
             list(counts=data_mat)),
@@ -175,7 +175,7 @@ size_factors = ro.r(
 )}
         """
 )
-adata_filtered.obs["size_factors"] = size_factors(data_mat)
+adata_filtered.obs["size_factors"] = size_factors(data_mat, adata_pp.obs["groups"])
 scran = adata_filtered.X / adata_filtered.obs["size_factors"].values[:, None]
 adata_filtered.layers["scran_normalization"] = csr_matrix(sc.pp.log1p(scran))
 
