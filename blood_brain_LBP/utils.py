@@ -4,21 +4,10 @@ import os
 import numpy as np
 import pandas as pd
 from bokeh.layouts import column, grid, layout, row
-from bokeh.models import (
-    BoxZoomTool,
-    CDSView,
-    ColorBar,
-    ColumnDataSource,
-    CustomJS,
-    CustomJSFilter,
-    Label,
-    LassoSelectTool,
-    LinearColorMapper,
-    RangeSlider,
-    ResetTool,
-    WheelZoomTool,
-    ZoomInTool,
-)
+from bokeh.models import (BoxZoomTool, CDSView, ColorBar, ColumnDataSource,
+                          CustomJS, CustomJSFilter, Label, LassoSelectTool,
+                          LinearColorMapper, RangeSlider, ResetTool,
+                          WheelZoomTool, ZoomInTool)
 from bokeh.palettes import Viridis256
 from bokeh.plotting import figure, output_file, show
 from bokeh.transform import factor_mark

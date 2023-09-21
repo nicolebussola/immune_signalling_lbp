@@ -9,18 +9,11 @@ def get_parser():
     """Returns the parser for all the args for run_ddqc function used via script/cli."""
     parser = argparse.ArgumentParser(prog="run_ddqc")
     parser.add_argument(
-        "--input-path",
+        "--batch-path",
         "-i",
         action=readable_directory,
         default=Path(),
         help="Path of the directory that contains cellranger outputs (h5) for each sample.",
-    )
-    parser.add_argument(
-        "--output-path",
-        "-o",
-        action=readable_directory,
-        default=Path(),
-        help="Output path: where to store the resulting csv with ddqc metrics.",
     )
     parser.add_argument(
         "--tissue",
@@ -39,7 +32,6 @@ if __name__ == "__main__":
     parser = get_parser()
     args = parser.parse_args()
     run_ddqc(
-        input_path=Path(args.input_path),
-        output_path=Path(args.output_path),
+        batch_path=Path(args.batch_path),
         tissue=args.tissue,
     )

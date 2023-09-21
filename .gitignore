@@ -160,3 +160,5 @@ cython_debug/
 #.idea/
 *.html
 .DS_Store
+*.h5ad
+*.png
