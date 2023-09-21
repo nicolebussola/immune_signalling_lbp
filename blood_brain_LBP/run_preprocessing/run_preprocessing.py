@@ -151,7 +151,7 @@ def run_preprocessing(input_path, output_path_plot, tissue, n_top_genes):
                     "object"
                 )
 
-                print(
+                logging.info(
                     f"Doublets (scDblFinder): {adata.obs.scDblFinder_class.value_counts()}"
                 )
 
@@ -164,7 +164,7 @@ def run_preprocessing(input_path, output_path_plot, tissue, n_top_genes):
                     inplace=True,
                 )
 
-                print(
+                logging.info(
                     f"Doublets (scrublet): {adata.obs.predicted_doublets_scrublet.value_counts()}"
                 )
 
@@ -255,4 +255,4 @@ def run_preprocessing(input_path, output_path_plot, tissue, n_top_genes):
 
                 adata.write(data_path / f"{PT}-{tissue}-{side}_QC.h5ad")
             except Exception as e:
-                print(e)
+                logging.error(e)

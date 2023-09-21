@@ -44,5 +44,3 @@ def run_ddqc(batch_path, tissue):
                 )
             except Exception as e:
                 logging.error(e)
-                print("\n")
-        print("\n\n")
