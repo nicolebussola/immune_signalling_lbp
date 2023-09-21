@@ -53,9 +53,6 @@ def is_outlier(adata, metric: str, nmads: int):
 
 np.random.seed(42)
 
-## Batch 1 ==> narsad_cellRanger_outs
-## Batch 2
-
 
 def run_preprocessing(input_path, output_path_plot, tissue, n_top_genes):
     data_path = input_path / tissue
