@@ -37,6 +37,13 @@ def get_parser():
         default=2000,
         help="Number of genes for feature selection",
     )
+    parser.add_argument(
+        "--save-plots",
+        "-s",
+        type=bool,
+        default=True,
+        help="Save interactive QC plots",
+    )
     return parser
 
 
@@ -48,4 +55,5 @@ if __name__ == "__main__":
         output_path_plot=Path(args.output_path_plot),
         tissue=args.tissue,
         n_top_genes=args.n_top_genes,
+        save_plots=args.save_plots,
     )

@@ -16,6 +16,13 @@ def get_parser():
         help="Path of the directory that contains h5ad for each sample after QC.",
     )
     parser.add_argument(
+        "--batch",
+        "-b",
+        choices=["1", "2"],
+        type=str,
+        help="Batch corresponding to input data",
+    )
+    parser.add_argument(
         "--output-path",
         "-o",
         action=readable_directory,
@@ -25,9 +32,7 @@ def get_parser():
     parser.add_argument(
         "--tissue",
         "-t",
-        choices=[
-            "blood",
-        ],
+        choices=["blood", "brain"],
         type=str,
         default="blood",
         help="Type of tissue (brain or blood), default: blood.",
@@ -48,14 +53,6 @@ def get_parser():
         help="Number of genes for feature selection. Default 4000",
     )
     parser.add_argument(
-        "--save-plots",
-        "-s",
-        choices=[True, False],
-        type=bool,
-        default=False,
-        help="save the interactive embedding plots as html, default: False.",
-    )
-    parser.add_argument(
         "--output-path-plot",
         "-p",
         action=readable_directory,
@@ -70,10 +67,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
     run_merge(
         input_path=Path(args.input_path),
+        batch=args.batch,
         output_path=Path(args.output_path),
         tissue=args.tissue,
         method_hvg=args.method_hvg,
         n_top_genes=args.n_top_genes,
-        save_plots=args.save_plots,
         output_path_plot=Path(args.output_path_plot),
     )
