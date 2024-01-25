@@ -4,28 +4,15 @@ QC_LABELS_SAMPLE = [
     "pct_counts_in_top_20_genes",
     "pct_counts_mt",
     "pct_counts_ribo",
-    "scDblFinder_score",
-    "doublet_scores_scrublet",
-    "scDblFinder_class",
     "predicted_doublets_scrublet",
+    "predicted_doublets_doubletdetection",
+    "predicted_doublets_scds",
+    "predicted_doublets_solo",
     "cluster_labels",
     "passed_qc",
 ]
 
-CHEMISTRY_V2_PATIENTS = ["PT-182", "PT-185"]
-
-QC_LABELS_BATCH_1 = [
-    "chemistry",
-    "pt",
-    "side",
-    "log1p_total_counts",
-    "log1p_n_genes_by_counts",
-    "pct_counts_in_top_20_genes",
-    "pct_counts_mt",
-    "pct_counts_ribo",
-    "scDblFinder_score",
-    "doublet_scores_scrublet",
-]
+CHEMISTRY_V2_PATIENTS = ["182", "185"]
 
 QC_LABELS_BATCH_2 = [
     "pt",
@@ -35,8 +22,12 @@ QC_LABELS_BATCH_2 = [
     "pct_counts_in_top_20_genes",
     "pct_counts_mt",
     "pct_counts_ribo",
-    "scDblFinder_score",
     "doublet_scores_scrublet",
+    "doublet_scores_doubletdetection",
+    "doublet_scores_scds",
 ]
 
-FAILED_QC_SAMPLES = ["PT-292-brain-L_QC"]
+
+QC_LABELS_BATCH_1 = QC_LABELS_BATCH_2 + ["chemistry"]
+
+FAILED_QC_SAMPLES = ["PT-292-brain-L_QC.h5ad"]

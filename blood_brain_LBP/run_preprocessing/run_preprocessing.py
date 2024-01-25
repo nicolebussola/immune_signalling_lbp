@@ -8,12 +8,17 @@ import rpy2.robjects as ro
 import scanpy as sc
 from bokeh.models import TabPanel, Tabs
 from bokeh.plotting import output_file, show
-from rich import print
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.table import Table
 from rpy2.robjects.packages import importr
-
+from .doublets_detection import (
+    scdblfinder,
+    scrublet,
+    scds,
+    doubletdetection_method,
+    solo,
+)
 from ..labels import QC_LABELS_SAMPLE
 from ..utils import QC_metrics_UMAP_plot, interactive_embedding
 
@@ -32,7 +37,6 @@ sc.settings.verbosity = 0
 
 importr("Seurat")
 importr("scater")
-importr("scDblFinder")
 importr("BiocParallel")
 importr("scry")
 
@@ -40,7 +44,14 @@ importr("scry")
 np.random.seed(42)
 
 
-def run_preprocessing(input_path, output_path_plot, tissue, n_top_genes, save_plots):
+def run_preprocessing(
+    input_path,
+    output_path_plot,
+    tissue,
+    n_top_genes,
+    doublet_methods_sequence,
+    save_plots,
+):
     log.critical(f"Tissue: {tissue}")
     data_path = input_path / tissue
     patients = sorted(
@@ -58,7 +69,7 @@ def run_preprocessing(input_path, output_path_plot, tissue, n_top_genes, save_pl
             patient_path = data_path / f"{PT}-{tissue}-{side}"
 
             try:
-                h5_name = f"{PT}-{side}-CellBender_filtered.h5"
+                h5_name = f"{PT}-{side}-B_CellBender_filtered.h5"
 
                 log.info(f"File name: {h5_name}")
 
@@ -78,7 +89,9 @@ def run_preprocessing(input_path, output_path_plot, tissue, n_top_genes, save_pl
 
                 log.info("Basic filtering (min cells and min genes)")
                 sc.pp.filter_genes(adata, min_cells=3)
-                sc.pp.filter_cells(adata, min_genes=200)
+                sc.pp.filter_cells(
+                    adata, min_genes=200
+                )  # probably already done in ddqc
 
                 log.info("Remove MALAT1")
                 malat1 = adata.var_names.str.startswith("MALAT1")
@@ -87,11 +100,8 @@ def run_preprocessing(input_path, output_path_plot, tissue, n_top_genes, save_pl
 
                 log.info("Compute pct mito, ribo, hb")
 
-                # mitochondrial genes
                 adata.var["mt"] = adata.var_names.str.startswith("MT-")
-                # ribosomal genes
                 adata.var["ribo"] = adata.var_names.str.startswith(("RPS", "RPL"))
-                # hemoglobin genes.
                 adata.var["hb"] = adata.var_names.str.contains(("^HB[^(P)]"))
 
                 sc.pp.calculate_qc_metrics(
@@ -103,59 +113,41 @@ def run_preprocessing(input_path, output_path_plot, tissue, n_top_genes, save_pl
                 )
 
                 log.info("Doublet detection")
-                data_mat = adata.X.T.copy()
+                name = f"{PT}-{tissue}-{side}"
+                doublets_methods = {
+                    "scdblfinder": (scdblfinder, [adata]),
+                    "scrublet": (scrublet, [adata]),
+                    "scds": (scds, [adata]),
+                    "doubletdetection": (
+                        doubletdetection_method,
+                        [adata, output_path_plot, name],
+                    ),
+                    "solo": (solo, [adata]),
+                }
 
-                scdblfinder = ro.r(
-                    """
-                    f <- function(data_mat){set.seed(123)
-                    sce = scDblFinder(
-                        SingleCellExperiment(
-                            list(counts=data_mat),
-                        )
-                    )
-                    doublet_score = sce$scDblFinder.score
-                    doublet_class = sce$scDblFinder.class
-                    return(list(doublet_score, doublet_class))}
-                        """
-                )
+                log.info(f"{doublet_methods_sequence}")
+                for f in doublet_methods_sequence:
+                    adata = doublets_methods[f][0](*doublets_methods[f][1])
 
-                doublet_results = scdblfinder(data_mat)
-                adata.obs["scDblFinder_score"] = doublet_results[0]
-                adata.obs["scDblFinder_class"] = doublet_results[1]
-                adata.obs["scDblFinder_class"] = adata.obs["scDblFinder_class"].astype(
-                    "object"
-                )
-
-                sc.external.pp.scrublet(adata, random_state=123)
-                adata.obs.rename(
-                    columns={
-                        "doublet_score": "doublet_scores_scrublet",
-                        "predicted_doublet": "predicted_doublets_scrublet",
-                    },
-                    inplace=True,
-                )
                 table = Table()
                 table.add_column("Method")
                 table.add_column("singlet")
                 table.add_column("doublet")
 
-                import ipdb
-
-                ipdb.set_trace()
-                table.add_row(
-                    "scDblFinder",
-                    str(adata.obs.scDblFinder_class.value_counts().tolist()[0]),
-                    str(adata.obs.scDblFinder_class.value_counts().tolist()[1]),
-                )
-                table.add_row(
-                    "scrublet",
-                    str(
-                        adata.obs.predicted_doublets_scrublet.value_counts().tolist()[0]
-                    ),
-                    str(
-                        adata.obs.predicted_doublets_scrublet.value_counts().tolist()[1]
-                    ),
-                )
+                for method in doublet_methods_sequence:
+                    try:
+                        doublets_count = (
+                            adata.obs[f"predicted_doublets_{method}"]
+                            .value_counts()
+                            .tolist()
+                        )
+                        table.add_row(
+                            method,
+                            str(doublets_count[0]),
+                            str(doublets_count[1]),
+                        )
+                    except Exception as e:
+                        log.exception(e)
 
                 console.print(table)
 
@@ -184,23 +176,27 @@ def run_preprocessing(input_path, output_path_plot, tissue, n_top_genes, save_pl
                 adata.layers["log1p_norm"] = sc.pp.log1p(scales_counts["X"], copy=True)
 
                 adata.X = adata.layers["log1p_norm"]
-                log.info(f"Plot UMAP embedding")
-                adata.obs["scDblFinder_class"] = adata.obs["scDblFinder_class"].astype(
-                    "str"
-                )
-                adata.obs["predicted_doublets_scrublet"] = adata.obs[
-                    "predicted_doublets_scrublet"
-                ].astype("str")
+
+                log.info("Plot UMAP embedding")
+
+                for method in doublet_methods_sequence:
+                    adata.obs[f"predicted_doublets_{method}"] = adata.obs[
+                        f"predicted_doublets_{method}"
+                    ].astype("str")
+
                 adata.var["highly_variable"] = adata.var["highly_deviant"]
 
                 sc.tl.pca(
                     adata, svd_solver="arpack", n_comps=20, use_highly_variable=True
                 )
-
                 sc.pp.neighbors(adata)
                 sc.tl.umap(adata)
 
                 adata.obs.index = [s.split("-")[0] for s in list(adata.obs.index)]
+
+                log.info(
+                    f"adata shape: {len(set(adata.obs.index))}, ddqc_obs sgape: {len(set(ddqc_obs.index))}"
+                )
                 adata = adata[
                     ~adata.obs.index.isin(
                         list(set(adata.obs.index) - (set(ddqc_obs.index)))
@@ -241,5 +237,6 @@ def run_preprocessing(input_path, output_path_plot, tissue, n_top_genes, save_pl
 
                 log.info(f"Save data")
                 adata.write(data_path / f"{PT}-{tissue}-{side}_QC.h5ad")
+
             except Exception as e:
                 log.exception(e)

@@ -1,37 +1,20 @@
-import scanpy as sc
-import pandas as pd
-import numpy as np
 import logging
-import os
-from pathlib import Path
-import anndata2ri
-from bokeh.models import TabPanel, Tabs, ColorBar
-from bokeh.plotting import show, output_file
-from scipy.stats import median_abs_deviation
-import seaborn as sns
-import scrublet as scr
-import seaborn as sns
-import rpy2.rinterface_lib.callbacks as rcb
-import rpy2.robjects as ro
-from utils import interactive_embedding, gridlayout
-import anndata as ad
-from scipy.sparse import csr_matrix, issparse
-from bokeh.plotting import show, output_file, output_notebook
-from bokeh.layouts import row, grid
-import warnings
-import numpy as np
-import scib
-from celltypist import models
-import celltypist
-from ..labels import (
-    CHEMISTRY_V2_PATIENTS,
-    FAILED_QC_SAMPLES,
-    QC_LABELS_BATCH_1,
-    QC_LABELS_BATCH_2,
-)
-from ..utils import gridlayout
-import scarches as sca
 import urllib
+import warnings
+
+import anndata2ri
+import celltypist
+import numpy as np
+import pandas as pd
+import scanpy as sc
+import scarches as sca
+from celltypist import models
+from rich.logging import RichHandler
+from rpy2.robjects.packages import importr
+
+from ..labels import (CHEMISTRY_V2_PATIENTS, FAILED_QC_SAMPLES,
+                      QC_LABELS_BATCH_1, QC_LABELS_BATCH_2)
+from ..utils import gridlayout
 
 importr("scry")
 importr("scran")
@@ -47,38 +30,38 @@ logging.basicConfig(
 )
 
 log = logging.getLogger("rich")
-timestamp = datetime.datetime.now().strftime("%m%d")
 
 
 def run_annotation_blood(
-    input_path,
+    project_path,
     batch,
     n_top_genes,
     method_hvg,
-    n_top_genes,
     integration,
-    res,
-    output_path_plot,
 ):
     log.info(f"Read adata and metadata for blood - batch {batch}")
     adata_name = f"blood_{n_top_genes}{method_hvg}_{integration}_clustered"
     adata = sc.read(project_path / f"{adata_name}.h5ad")
-    meta_df = pd.read_csv(project_path / f"Batch{batch}_celllevel_metadata.tsv",sep="\t")
-    meta_df['donor'] = meta_df['donor'].apply(lambda x: ('-').join((x.split('-')[0], x.split('-')[1][1:])))
-    age_dict = meta_df.groupby('donor')['age'].agg(lambda x: x.unique()[0]).to_dict()
-    sex_dict = meta_df.groupby('donor')['sex'].agg(lambda x: x.unique()[0]).to_dict()
-    diag_dict = meta_df.groupby('donor')['diagnosis'].agg(lambda x: x.unique()[0]).to_dict()
+    meta_df = pd.read_csv(
+        project_path / f"Batch{batch}_celllevel_metadata.tsv", sep="\t"
+    )
+    meta_df["donor"] = meta_df["donor"].apply(
+        lambda x: ("-").join((x.split("-")[0], x.split("-")[1][1:]))
+    )
+    age_dict = meta_df.groupby("donor")["age"].agg(lambda x: x.unique()[0]).to_dict()
+    sex_dict = meta_df.groupby("donor")["sex"].agg(lambda x: x.unique()[0]).to_dict()
+    diag_dict = (
+        meta_df.groupby("donor")["diagnosis"].agg(lambda x: x.unique()[0]).to_dict()
+    )
 
-    adata.obs['age'] = adata.obs['pt'].map(age_dict).astype(int)
-    adata.obs['sex'] = adata.obs['pt'].map(sex_dict)
-    adata.obs['diagnosis'] = adata.obs['pt'].map(diag_dict)
- 
+    adata.obs["age"] = adata.obs["pt"].map(age_dict).astype(int)
+    adata.obs["sex"] = adata.obs["pt"].map(sex_dict)
+    adata.obs["diagnosis"] = adata.obs["pt"].map(diag_dict)
+
     log.critical(f"CellTypist annotation")
     adata_celltypist = adata.copy()
     adata_celltypist.X = adata.layers["counts"]
-    sc.pp.normalize_per_cell(
-        adata_celltypist, counts_per_cell_after=10**4
-    )
+    sc.pp.normalize_per_cell(adata_celltypist, counts_per_cell_after=10**4)
     sc.pp.log1p(adata_celltypist)
     adata_celltypist.X = adata_celltypist.X.toarray()
 
@@ -102,10 +85,9 @@ def run_annotation_blood(
     ]
 
     predictions_low = celltypist.annotate(
-    adata_celltypist, model=model_low, majority_voting=True
+        adata_celltypist, model=model_low, majority_voting=True
     )
     predictions_low_adata = predictions_low.to_adata()
-
 
     adata.obs["celltypist_cell_label_fine"] = predictions_low_adata.obs.loc[
         adata.obs.index, "majority_voting"
@@ -123,15 +105,16 @@ def run_annotation_blood(
             del adata_to_map.layers[layer]
     adata_to_map.X = adata_to_map.layers["counts"]
     reference_model_features = pd.read_csv(
-    "https://figshare.com/ndownloader/files/41436645", index_col=0
+        "https://figshare.com/ndownloader/files/41436645", index_col=0
     )
     adata_to_map.var["gene_names"] = adata_to_map.var.index
-    log.info(f"Total number of genes needed for mapping: {reference_model_features.shape[0]}")
+    log.info(
+        f"Total number of genes needed for mapping: {reference_model_features.shape[0]}"
+    )
 
     log.info(
-    f"Number of genes found in query dataset:
-    {adata_to_map.var.index.isin(reference_model_features.index).sum()}",
-)
+        f"Number of genes found in query dataset:{adata_to_map.var.index.isin(reference_model_features.index).sum()}"
+    )
     log.info("Add missing genes")
 
     missing_genes = [
@@ -140,7 +123,9 @@ def run_annotation_blood(
         if gene_id not in adata_to_map.var.index
     ]
     missing_gene_adata = sc.AnnData(
-        X=csr_matrix(np.zeros(shape=(adata.n_obs, len(missing_genes))), dtype="float32"),
+        X=csr_matrix(
+            np.zeros(shape=(adata.n_obs, len(missing_genes))), dtype="float32"
+        ),
         obs=adata.obs.iloc[:, :1],
         var=reference_model_features.loc[missing_genes, :],
     )
@@ -148,7 +133,7 @@ def run_annotation_blood(
 
     if "PCs" in adata_to_map.varm.keys():
         del adata_to_map.varm["PCs"]
-    
+
     adata_to_map_augmented = sc.concat(
         [adata_to_map, missing_gene_adata],
         axis=1,
@@ -157,10 +142,10 @@ def run_annotation_blood(
         merge="unique",
     )
     adata_to_map_augmented = adata_to_map_augmented[
-    :, reference_model_features.index
+        :, reference_model_features.index
     ].copy()
-    
-    assert(adata_to_map_augmented.var.index == reference_model_features.index).all()
+
+    assert (adata_to_map_augmented.var.index == reference_model_features.index).all()
     adata_to_map_augmented.var["gene_ids"] = adata_to_map_augmented.var.index
     adata_to_map_augmented.var.set_index("gene_names", inplace=True)
 
@@ -174,9 +159,9 @@ def run_annotation_blood(
         )
     adata_to_map_augmented.obs["batch"] = adata_to_map_augmented.obs["pt"]
     scarches_model = sca.models.SCVI.load_query_data(
-    adata=adata_to_map_augmented,
-    reference_model="./reference_model",
-    freeze_dropout=True,
+        adata=adata_to_map_augmented,
+        reference_model="./reference_model",
+        freeze_dropout=True,
     )
     scarches_model.train(max_epochs=500, plan_kwargs=dict(weight_decay=0.0))
     adata.obsm["X_scVI"] = scarches_model.get_latent_representation()
@@ -193,14 +178,5 @@ def run_annotation_blood(
     adata_emb.obs["reference_or_query"] = "query"
 
     emb_ref_query = sc.concat(
-        [ref_emb, adata_emb],
-        axis=0,
-        join="outer",
-        index_unique=None,
-        merge="unique",
+        [ref_emb, adata_emb], axis=0, join="outer", index_unique=None, merge="unique"
     )
-
-
-
-
-

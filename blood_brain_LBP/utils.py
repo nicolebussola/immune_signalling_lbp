@@ -4,19 +4,14 @@ import os
 import numpy as np
 import pandas as pd
 from bokeh.layouts import column, grid, layout, row
-from bokeh.models import (
-    CDSView,
-    ColorBar,
-    ColumnDataSource,
-    CustomJS,
-    CustomJSFilter,
-    Label,
-    LinearColorMapper,
-    RangeSlider,
-)
+from bokeh.models import (CDSView, ColorBar, ColumnDataSource, CustomJS,
+                          CustomJSFilter, Label, LinearColorMapper,
+                          RangeSlider)
 from bokeh.palettes import Viridis256
 from bokeh.plotting import figure, output_file, show
-from labels import QC_LABELS_SAMPLE
+
+from .labels import QC_LABELS_SAMPLE
+
 TOOLTIPS = [
     ("index", "$index"),
     ("(x,y)", "($x, $y)"),
@@ -24,8 +19,9 @@ TOOLTIPS = [
 ]
 TOOLS = "hover,crosshair,pan,wheel_zoom,zoom_in,zoom_out,box_zoom,undo,redo,reset,tap,save,box_select,poly_select,lasso_select,examine,help"
 
-QC_LABELS_CONT = QC_LABELS_SAMPLE[:-4]
-QC_LABELS_CAT = QC_LABELS_SAMPLE[-4:]
+QC_LABELS_CONT = QC_LABELS_SAMPLE[:-6]
+QC_LABELS_CAT = QC_LABELS_SAMPLE[-6:]
+
 
 class readable_directory(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):

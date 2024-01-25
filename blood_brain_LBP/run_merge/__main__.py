@@ -40,7 +40,7 @@ def get_parser():
     parser.add_argument(
         "--method-hvg",
         "-m",
-        choices=["HighlyDeviant", "cell_ranger"],
+        choices=["HighlyDeviant", "cell_ranger", "HighlyDeviant_cr"],
         type=str,
         default="cell_ranger",
         help="Method for feature selection, default: cell_ranger.",
@@ -51,13 +51,6 @@ def get_parser():
         type=int,
         default=4000,
         help="Number of genes for feature selection. Default 4000",
-    )
-    parser.add_argument(
-        "--output-path-plot",
-        "-p",
-        action=readable_directory,
-        default=Path(),
-        help="Where to save the plots.",
     )
     return parser
 
@@ -72,5 +65,4 @@ if __name__ == "__main__":
         tissue=args.tissue,
         method_hvg=args.method_hvg,
         n_top_genes=args.n_top_genes,
-        output_path_plot=Path(args.output_path_plot),
     )

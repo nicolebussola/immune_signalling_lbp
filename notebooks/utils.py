@@ -4,16 +4,9 @@ import os
 import numpy as np
 import pandas as pd
 from bokeh.layouts import column, grid, layout, row
-from bokeh.models import (
-    CDSView,
-    ColorBar,
-    ColumnDataSource,
-    CustomJS,
-    CustomJSFilter,
-    Label,
-    LinearColorMapper,
-    RangeSlider,
-)
+from bokeh.models import (CDSView, ColorBar, ColumnDataSource, CustomJS,
+                          CustomJSFilter, Label, LinearColorMapper,
+                          RangeSlider)
 from bokeh.palettes import Viridis256
 from bokeh.plotting import figure, output_file, show
 from bokeh.transform import factor_mark
@@ -190,7 +183,7 @@ def interactive_embedding(
     Returns:
         bokeh.plotting._figure.figure: interactive embedding plot colored by label
     """
-    samples = np.array(list(adata.obs[LABEL].index))
+    samples = np.array(list(adata.obs[label].index))
     embedding = np.array(adata.obsm[f"X_{embedding_method}"].astype(float))
 
     p = figure(
@@ -207,15 +200,15 @@ def interactive_embedding(
     p.title.text_font_size = "25px"
 
     # categorical label
-    if f"{LABEL}_colors" in list(adata.uns.keys()):
-        mycols = adata.uns[f"{LABEL}_colors"]
+    if f"{label}_colors" in list(adata.uns.keys()):
+        mycols = adata.uns[f"{label}_colors"]
 
         try:
-            myclasses = sorted(pd.unique(adata.obs[LABEL]), key=int)
+            myclasses = sorted(pd.unique(adata.obs[label]), key=int)
         except ValueError:
-            myclasses = pd.unique(adata.obs[LABEL])
+            myclasses = pd.unique(adata.obs[label])
         for col, theclass in zip(mycols, myclasses):
-            idx = np.where(np.array(list(adata.obs[LABEL])) == str(theclass))[
+            idx = np.where(np.array(list(adata.obs[label])) == str(theclass))[
                 0
             ].tolist()
 
@@ -270,7 +263,7 @@ def interactive_embedding(
             Coordinates: ($x, $y)<br>
             Target value <font face="Arial" size="2">@value{0.2f} </font> <br> <br>
         """
-        field = adata.obs[LABEL].values.astype(float)
+        field = adata.obs[label].values.astype(float)
         colormapper = LinearColorMapper(
             palette=Viridis256, low=min(field), high=max(field)
         )
