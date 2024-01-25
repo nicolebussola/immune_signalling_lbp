@@ -37,6 +37,21 @@ def get_parser():
         default=2000,
         help="Number of genes for feature selection",
     )
+    parser.add_argument(
+        "--save-plots",
+        "-s",
+        type=bool,
+        default=True,
+        help="Save interactive QC plots",
+    )
+    parser.add_argument(
+        "--doublet_methods_sequence",
+        "-l",
+        nargs="+",
+        help="List of doublet detection methods to use",
+        required=True,
+    )
+
     return parser
 
 
@@ -48,4 +63,6 @@ if __name__ == "__main__":
         output_path_plot=Path(args.output_path_plot),
         tissue=args.tissue,
         n_top_genes=args.n_top_genes,
+        doublet_methods_sequence=args.doublet_methods_sequence,
+        save_plots=args.save_plots,
     )

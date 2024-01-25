@@ -18,6 +18,6 @@ source activate /sc/arion/work/busson02/LBP/envs/CellBender
 unset PYTHONPATH
 
 
-mkdir PT-290-blood-L
+mkdir PT-292-blood-L
 
-cellbender remove-background  --input /sc/arion/projects/psychgen/lbp/data/RAW/rna/sc/chromium/TD005881/TD005881_AlexCharney/R01AG069976AIM2SC7903/outs/raw_feature_bc_matrix.h5 --output PT-290-blood-L/PT-290-L-CellBender.h5  --cuda
+cellbender remove-background  --input /sc/arion/projects/psychgen/lbp/data/RAW/rna/sc/chromium/TD005881/TD005881_AlexCharney/R01AG069976AIM2SC1761/outs/raw_feature_bc_matrix.h5 --output PT-290-blood-L/PT-290-L-CellBender.h5  --cuda

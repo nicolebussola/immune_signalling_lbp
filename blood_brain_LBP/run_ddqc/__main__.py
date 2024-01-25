@@ -18,9 +18,7 @@ def get_parser():
     parser.add_argument(
         "--tissue",
         "-t",
-        choices=[
-            "blood",
-        ],
+        choices=["blood", "brain"],
         type=str,
         default="blood",
         help="Type of tissue (brain or blood), default: blood.",
