@@ -4,10 +4,6 @@ QC_LABELS_SAMPLE = [
     "pct_counts_in_top_20_genes",
     "pct_counts_mt",
     "pct_counts_ribo",
-    "predicted_doublets_scrublet",
-    "predicted_doublets_doubletdetection",
-    "predicted_doublets_scds",
-    "predicted_doublets_solo",
     "cluster_labels",
     "passed_qc",
 ]
@@ -22,9 +18,6 @@ QC_LABELS_BATCH_2 = [
     "pct_counts_in_top_20_genes",
     "pct_counts_mt",
     "pct_counts_ribo",
-    "doublet_scores_scrublet",
-    "doublet_scores_doubletdetection",
-    "doublet_scores_scds",
 ]
 
 
