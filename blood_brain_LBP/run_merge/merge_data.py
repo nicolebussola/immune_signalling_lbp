@@ -39,13 +39,16 @@ logging.basicConfig(
 log = logging.getLogger("rich")
 timestamp = datetime.datetime.now().strftime("%m%d")
 
+
 def convert_to_categorical(column, threshold_unique_values=15):
     if column.nunique() < threshold_unique_values:
-        return column.astype('category')
+        return column.astype("category")
     else:
         return column
 
+
 # Apply the function to all columns
+
 
 def run_merge(
     input_path,
@@ -73,10 +76,13 @@ def run_merge(
             adata_sample = adata_sample[
                 adata_sample.obs[adata_sample.obs["log1p_total_counts"] > 7.73].index, :
             ]
-            
+        if "predicted_doublets_consensus" not in adata_sample.obs.columns:
+            log.critical(sample)
         adata_sample.obs["pt"] = sample.split("-")[1]
         adata_sample.obs["side"] = sample.split("-")[3][:1]
-        adata_sample.obs["pt-side"] = adata_sample.obs["pt"]  + '-' + adata_sample.obs["side"]
+        adata_sample.obs["pt-side"] = (
+            adata_sample.obs["pt"] + "-" + adata_sample.obs["side"]
+        )
         adata_sample.obs["tissue"] = sample.split("-")[2]
         samples_adata.append(adata_sample)
         sum_cells += adata_sample.shape[0]
@@ -84,29 +90,30 @@ def run_merge(
     log.info(f"n={len(sample_list)} Samples: {sorted(sample_list)}")
     log.info(f"Sum cells: {sum_cells}")
 
-    adata_merged = ad.concat(samples_adata, join="inner", index_unique="_")
+    adata_merged = ad.concat(
+        samples_adata, join="inner", index_unique="_", merge="same"
+    )
     del samples_adata
     adata_merged.obs_names_make_unique()
     adata_merged.var_names_make_unique()
     adata_merged.obs["chemistry"] = adata_merged.obs["pt"].apply(
         lambda x: "v2" if x in CHEMISTRY_V2_PATIENTS else "v3"
     )
-    adata_merged.obs['predicted_doublets_doubletdetection']=adata_merged.obs['predicted_doublets_doubletdetection'].astype(float).astype(int)
-    adata_merged.obs['predicted_doublets_scrublet']=adata_merged.obs['predicted_doublets_scrublet'].map({'True': True, 'False': False}).astype(int)
-    adata_merged.obs['predicted_doublets_solo']=adata_merged.obs['predicted_doublets_solo'].map({'singlet': 0, 'doublet': 1}).astype(int)
-    adata_merged.obs['predicted_doublets_consensus'] = adata_merged.obs[['predicted_doublets_scrublet', 'predicted_doublets_scds', 'predicted_doublets_doubletdetection', 'predicted_doublets_solo',]].all(axis=1).astype(str)
+
     adata_merged.X = adata_merged.layers["counts"].copy()
 
     log.critical("Data Filtering")
 
-    t_mito = 40 if tissue=="blood" else 10 ## See Osorio D, Cai JJ. Systematic determination of the mitochondrial proportion in human and mice tissues for single-cell RNA-sequencing data quality control. Bioinformatics. 2021 May 17;37(7):963-967. doi: 10.1093/bioinformatics/btaa751. PMID: 32840568; PMCID: PMC8599307.
-
+    t_mito = (
+        20 if tissue == "blood" else 20
+    )  ## See Osorio D, Cai JJ. Systematic determination of the mitochondrial proportion in human and mice tissues for single-cell RNA-sequencing data quality control. Bioinformatics. 2021 May 17;37(7):963-967. doi: 10.1093/bioinformatics/btaa751. PMID: 32840568; PMCID: PMC8599307.
+    # Based on our analytical results, we suggest a standardized mtDNA% threshold of 10% for scRNA-seq QC of human samples.
     adata_filtered = adata_merged[
-        (adata_merged.obs["predicted_doublets_consensus"] == 'False')
+        (adata_merged.obs["predicted_doublets_consensus"] == "False")
         & (adata_merged.obs["passed_qc"] == "True")
         & (adata_merged.obs["pct_counts_mt"] < t_mito)
     ].copy()
-
+    sc.pp.filter_cells(adata_filtered, min_genes=200)
 
     log.info(f"Merged data prefiltering: {adata_merged.shape}")
     log.info(f"Merged data after filtering: {adata_filtered.shape}")
@@ -127,44 +134,44 @@ def run_merge(
 
     log.info("Scran normalization")
 
-    # adata_pp = adata_filtered.copy()
+    adata_pp = adata_filtered.copy()
 
-    # logging.info("Preclustering data....")
-    # sc.pp.normalize_total(adata_pp)
-    # sc.pp.log1p(adata_pp)
-    # sc.pp.pca(adata_pp, n_comps=25)
-    # sc.pp.neighbors(adata_pp)
-    # sc.tl.leiden(adata_pp, key_added="groups")
+    logging.info("Preclustering data....")
+    sc.pp.normalize_total(adata_pp)
+    sc.pp.log1p(adata_pp)
+    sc.pp.pca(adata_pp, n_comps=25)
+    sc.pp.neighbors(adata_pp)
+    sc.tl.leiden(adata_pp, key_added="groups")
 
-    # log.info("Computing size factors........")
-    # data_mat = adata_pp.X.T
-    # # convert to CSC if possible. See https://github.com/MarioniLab/scran/issues/70
-    # if issparse(data_mat):
-    #     if data_mat.nnz > 2**31 - 1:
-    #         data_mat = data_mat.tocoo()
+    log.info("Computing size factors........")
+    data_mat = adata_pp.X.T
+    # convert to CSC if possible. See https://github.com/MarioniLab/scran/issues/70
+    if issparse(data_mat):
+        if data_mat.nnz > 2**31 - 1:
+            data_mat = data_mat.tocoo()
 
-    #     else:
-    #         data_mat = data_mat.tocsc()
+        else:
+            data_mat = data_mat.tocsc()
 
-    # input_groups = adata_pp.obs["groups"]
-    # del adata_pp
+    input_groups = adata_pp.obs["groups"]
+    del adata_pp
 
-    # size_factors = ro.r(
-    #     """
-    #     f <- function(data_mat, input_groups){sizeFactors(
-    #     computeSumFactors(
-    #         SingleCellExperiment(
-    #             list(counts=data_mat)),
-    #             clusters = input_groups,
-    #             min.mean = 0.1,
-    #             BPPARAM = MulticoreParam()
-    #     )
-    # )}
-    #         """
-    # )
-    # adata_filtered.obs["size_factors"] = size_factors(data_mat, input_groups)
-    # scran = adata_filtered.X / adata_filtered.obs["size_factors"].values[:, None]
-    # adata_filtered.layers["scran_normalization"] = csr_matrix(sc.pp.log1p(scran))
+    size_factors = ro.r(
+        """
+        g <- function(data_mat, input_groups){sizeFactors(
+        computeSumFactors(
+            SingleCellExperiment(
+                list(counts=data_mat)),
+                clusters = input_groups,
+                min.mean = 0.1,
+                BPPARAM = MulticoreParam()
+        )
+    )}
+            """
+    )
+    adata_filtered.obs["size_factors"] = ro.globalenv["g"](data_mat, input_groups)
+    scran = adata_filtered.X / adata_filtered.obs["size_factors"].values[:, None]
+    adata_filtered.layers["scran_normalization"] = csr_matrix(sc.pp.log1p(scran))
 
     # log.info("Pearson residuals")
     # adata_filtered.X = adata_filtered.layers["counts"].copy()
@@ -180,7 +187,6 @@ def run_merge(
 
     adata_filtered.obs = adata_filtered.obs.apply(convert_to_categorical)
 
-   
     # adata_filtered.write(output_path / f"batch_{batch}_{tissue}_filteredscdbl_normalized.h5ad")
 
     log.critical("Feature selection")
@@ -196,8 +202,8 @@ def run_merge(
         )
         adata_hvg = adata_filtered[:, adata_filtered.var["highly_variable"]].copy()
 
-    if method_hvg == "HighlyDeviant": ## NB ADD BATCH
-        batches = ro.FactorVector(adata_filtered.obs['pt'])
+    if method_hvg == "HighlyDeviant":
+        batches = ro.FactorVector(adata_filtered.obs["pt"])
 
         dfs = ro.r(
             """
@@ -208,8 +214,8 @@ def run_merge(
         )
 
         adata_filtered_dev = adata_filtered.copy()
-        adata_filtered_dev.obs = adata_filtered_dev.obs[["pt","side"]]
-        binomial_deviance = dfs(adata_filtered_dev,batches).T
+        adata_filtered_dev.obs = adata_filtered_dev.obs[["pt", "side"]]
+        binomial_deviance = ro.globalenv["f"](adata_filtered_dev, batches).T
 
         idx = binomial_deviance.argsort()[-n_top_genes:]
         mask = np.zeros(adata_filtered.var_names.shape, dtype=bool)
@@ -219,24 +225,25 @@ def run_merge(
         adata_filtered.var["highly_variable"] = adata_filtered.var["highly_deviant"]
         adata_hvg = adata_filtered[:, adata_filtered.var["highly_variable"]].copy()
 
-
     elif method_hvg == "HighlyDeviant_cr":
         dfs = ro.r(
             """
-            f <- function(adata){
+            g <- function(adata){
             sce=devianceFeatureSelection(adata, assay="X")
             return(rowData(sce)$binomial_deviance)}
             """
         )
         log.info(f"Compute n={2*n_top_genes} top genes with HighlyDeviant approach")
-        binomial_deviance = dfs(adata_filtered).T
-        idx = binomial_deviance.argsort()[-2*n_top_genes:]
+        binomial_deviance = ro.globalenv["g"](adata_filtered).T
+        idx = binomial_deviance.argsort()[-2 * n_top_genes :]
         mask = np.zeros(adata_filtered.var_names.shape, dtype=bool)
         mask[idx] = True
         adata_filtered.var["highly_deviant"] = mask
         adata_filtered.var["binomial_deviance"] = binomial_deviance
         adata_filtered.var["highly_variable"] = adata_filtered.var["highly_deviant"]
-        adata_filtered_hvg = adata_filtered[:, adata_filtered.var["highly_variable"]].copy()
+        adata_filtered_hvg = adata_filtered[
+            :, adata_filtered.var["highly_variable"]
+        ].copy()
         log.info(f"Further reduce to n={n_top_genes} top genes with scran batch-wise")
         batch_key = "chemistry" if batch == "1" else "pt"
         sc.pp.highly_variable_genes(
@@ -245,9 +252,9 @@ def run_merge(
             flavor="cell_ranger",
             batch_key=batch_key,
         )
-        adata_hvg = adata_filtered_hvg[:, adata_filtered_hvg.var["highly_variable"]].copy()
-
-
+        adata_hvg = adata_filtered_hvg[
+            :, adata_filtered_hvg.var["highly_variable"]
+        ].copy()
 
     adata_hvg.X = adata_hvg.layers["log1p_norm"].copy()
     sc.pp.pca(adata_hvg, svd_solver="arpack")
@@ -264,26 +271,25 @@ def run_merge(
             LABELS,
             adata_hvg,
             fname=output_path_plot
-            / f"merged_{tissue}_cellbender_QC_filtered_{n_top_genes}{method_hvg}_{timestamp}.html",
+            / f"merged_{tissue}_cellbender_QC_filtered_{n_top_genes}{method_hvg}_{timestamp}_{t_mito}.html",
         )
-
 
     log.info(f"Compute Unintegration metrics per batch key")
     batch_keys = ["chemistry", "pt", "side"] if batch == "1" else ["pt", "side"]
 
     unintegrated_metrics = []
-    for bk in batch_keys:
-        log.info(f"Compute metrics per batch {bk}")
+    # for bk in batch_keys:
+    #     log.info(f"Compute metrics per batch {bk}")
 
-        unintegrated_metrics.extend(
-            (
-                scib.metrics.pcr_comparison(adata_filtered, adata_hvg, covariate=bk),
-                scib.me.cell_cycle(
-                    adata_filtered, adata_hvg, batch_key=bk, organism="human"
-                ),
-                scib.me.hvg_overlap(adata_filtered, adata_hvg, batch_key=bk),
-            )
-        )
+    #     unintegrated_metrics.extend(
+    #         (
+    #             scib.metrics.pcr_comparison(adata_filtered, adata_hvg, covariate=bk),
+    #             scib.me.cell_cycle(
+    #                 adata_filtered, adata_hvg, batch_key=bk, organism="human"
+    #             ),
+    #             scib.me.hvg_overlap(adata_filtered, adata_hvg, batch_key=bk),
+    #         )
+    #     )
 
     del adata_filtered
     log.critical("Data integration")
@@ -318,9 +324,11 @@ def run_merge(
             LABELS,
             adata_harmony,
             fname=output_path_plot
-            / f"merged_{tissue}_cellbender_QC_filtered_{n_top_genes}{method_hvg}_harmonyPtSide_{timestamp}.html",
+            / f"merged_{tissue}_cellbender_QC_filtered_{n_top_genes}{method_hvg}_harmonyPtSide_{timestamp}_{t_mito}.html",
         )
+    import ipdb
 
+    ipdb.set_trace()
     log.info("ScVI integration")
     adata_scvi = adata_hvg.copy()
 
@@ -338,7 +346,7 @@ def run_merge(
             batch_key="pt-side",
         )
     model_scvi = scvi.model.SCVI(adata_scvi)
-    model_scvi.train(use_gpu=False, max_epochs=None)
+    model_scvi.train(max_epochs=None)
     adata_scvi.obsm["X_scVI"] = model_scvi.get_latent_representation()
     adata_scvi.layers["X_normalized_scVI"] = model_scvi.get_normalized_expression()
     sc.pp.neighbors(adata_scvi, use_rep="X_scVI")
@@ -353,7 +361,7 @@ def run_merge(
             LABELS,
             adata_scvi,
             fname=output_path_plot
-            / f"merged_{tissue}_cellbender_QC_filtered_{n_top_genes}{method_hvg}_scvi_{timestamp}.html",
+            / f"merged_{tissue}_cellbender_QC_filtered_{n_top_genes}{method_hvg}_scvi_{timestamp}_{t_mito}.html",
         )
 
     logging.critical("Leiden clustering and saving adata")
@@ -371,10 +379,12 @@ def run_merge(
     #         sc.tl.leiden(adata, key_added=k, resolution=res)
 
     adata_harmony.write(
-        output_path / f"batch_{batch}_{tissue}_filtered_{n_top_genes}{method_hvg}_harmony.h5ad"
+        output_path
+        / f"batch_{batch}_{tissue}_filtered_{n_top_genes}{method_hvg}_{t_mito}_harmony.h5ad"
     )
     adata_scvi.write(
-        output_path / f"batch_{batch}_{tissue}_filtered_{n_top_genes}{method_hvg}_scvi.h5ad"
+        output_path
+        / f"batch_{batch}_{tissue}_filtered_{n_top_genes}{method_hvg}_{t_mito}_scvi.h5ad"
     )
 
     log.critical("Compare integration methods")
@@ -388,7 +398,10 @@ def run_merge(
         harmony_metrics.extend(
             (
                 scib.metrics.pcr_comparison(
-                    adata_hvg, adata_harmony, covariate=bk, embed="X_pca_harmony_pt-side"
+                    adata_hvg,
+                    adata_harmony,
+                    covariate=bk,
+                    embed="X_pca_harmony_pt-side",
                 ),
                 scib.me.cell_cycle(
                     adata_hvg, adata_harmony, batch_key=bk, organism="human"
@@ -431,5 +444,5 @@ def run_merge(
     df.style.background_gradient(cmap="Blues")
     df.to_csv(
         input_path
-        / f"{tissue}_filtered_{n_top_genes}{method_hvg}_integration_comparison_{timestamp}.csv"
+        / f"{tissue}_filtered_{n_top_genes}{method_hvg}_{t_mito}_integration_comparison_{timestamp}.csv"
     )
