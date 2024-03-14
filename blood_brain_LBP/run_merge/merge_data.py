@@ -19,8 +19,12 @@ from scipy.sparse import csr_matrix, issparse
 from tabulate import tabulate
 from tqdm import tqdm
 
-from ..labels import (CHEMISTRY_V2_PATIENTS, FAILED_QC_SAMPLES,
-                      QC_LABELS_BATCH_1, QC_LABELS_BATCH_2)
+from ..labels import (
+    CHEMISTRY_V2_PATIENTS,
+    FAILED_QC_SAMPLES,
+    QC_LABELS_BATCH_1,
+    QC_LABELS_BATCH_2,
+)
 from ..utils import gridlayout
 
 importr("scry")
@@ -45,9 +49,6 @@ def convert_to_categorical(column, threshold_unique_values=15):
         return column.astype("category")
     else:
         return column
-
-
-# Apply the function to all columns
 
 
 def run_merge(
@@ -106,8 +107,7 @@ def run_merge(
 
     t_mito = (
         20 if tissue == "blood" else 20
-    )  ## See Osorio D, Cai JJ. Systematic determination of the mitochondrial proportion in human and mice tissues for single-cell RNA-sequencing data quality control. Bioinformatics. 2021 May 17;37(7):963-967. doi: 10.1093/bioinformatics/btaa751. PMID: 32840568; PMCID: PMC8599307.
-    # Based on our analytical results, we suggest a standardized mtDNA% threshold of 10% for scRNA-seq QC of human samples.
+    )  
     adata_filtered = adata_merged[
         (adata_merged.obs["predicted_doublets_consensus"] == "False")
         & (adata_merged.obs["passed_qc"] == "True")
@@ -119,6 +119,7 @@ def run_merge(
     log.info(f"Merged data after filtering: {adata_filtered.shape}")
 
     del adata_merged
+
 
     adata_filtered.X = adata_filtered.layers["counts"].copy()
 
@@ -278,18 +279,18 @@ def run_merge(
     batch_keys = ["chemistry", "pt", "side"] if batch == "1" else ["pt", "side"]
 
     unintegrated_metrics = []
-    # for bk in batch_keys:
-    #     log.info(f"Compute metrics per batch {bk}")
+    for bk in batch_keys:
+        log.info(f"Compute metrics per batch {bk}")
 
-    #     unintegrated_metrics.extend(
-    #         (
-    #             scib.metrics.pcr_comparison(adata_filtered, adata_hvg, covariate=bk),
-    #             scib.me.cell_cycle(
-    #                 adata_filtered, adata_hvg, batch_key=bk, organism="human"
-    #             ),
-    #             scib.me.hvg_overlap(adata_filtered, adata_hvg, batch_key=bk),
-    #         )
-    #     )
+        unintegrated_metrics.extend(
+            (
+                scib.metrics.pcr_comparison(adata_filtered, adata_hvg, covariate=bk),
+                scib.me.cell_cycle(
+                    adata_filtered, adata_hvg, batch_key=bk, organism="human"
+                ),
+                scib.me.hvg_overlap(adata_filtered, adata_hvg, batch_key=bk),
+            )
+        )
 
     del adata_filtered
     log.critical("Data integration")
@@ -327,7 +328,6 @@ def run_merge(
             / f"merged_{tissue}_cellbender_QC_filtered_{n_top_genes}{method_hvg}_harmonyPtSide_{timestamp}_{t_mito}.html",
         )
     import ipdb
-
     ipdb.set_trace()
     log.info("ScVI integration")
     adata_scvi = adata_hvg.copy()
@@ -364,19 +364,7 @@ def run_merge(
             / f"merged_{tissue}_cellbender_QC_filtered_{n_top_genes}{method_hvg}_scvi_{timestamp}_{t_mito}.html",
         )
 
-    logging.critical("Leiden clustering and saving adata")
-    # for adata in [adata_harmony, adata_scvi]:
-    #     for k, res in zip(
-    #         [
-    #             "leiden_res0_5",
-    #             "leiden_res1",
-    #             "leiden_res1_25",
-    #             "leiden_res1_5",
-    #             "leiden_res1_75",
-    #         ],
-    #         [0.5, 1, 1.25, 1.5, 1.75],
-    #     ):
-    #         sc.tl.leiden(adata, key_added=k, resolution=res)
+    logging.critical("Save adata")
 
     adata_harmony.write(
         output_path
