@@ -5,7 +5,7 @@ import numpy as np
 import scanpy as sc
 from rich.logging import RichHandler
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, classification_report, matthews_corrcoef
+from sklearn.metrics import accuracy_score, matthews_corrcoef
 from sklearn.model_selection import StratifiedKFold
 from utils import gridlayout
 
@@ -113,7 +113,7 @@ def run_unmix_samples(
 
     adata_L.obs[(adata_L.obs["pt"] == "280") & (adata_L.obs["changed"] == "swap")]
     adata_L.obs[(adata_L.obs["pt"] == "289") & (adata_L.obs["changed"] == "swap")].index
-    
+
     log.info("Write .txt files for variant calling")
     L280_to_L289 = [
         ("-").join((cb.split("_")[0], "1"))
