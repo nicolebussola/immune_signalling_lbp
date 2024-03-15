@@ -160,4 +160,4 @@ def run_unmix_samples(
     blood_adata_unmixed.obs.loc[
         blood_adata_unmixed.obs.index.isin(adata_L.obs.index), "pt"
     ] = adata_L.obs["pt_rf"]
-    sc.write(project_path / blood_adata_name, blood_adata)
+    sc.write(project_path / blood_adata_name, blood_adata_unmixed)
