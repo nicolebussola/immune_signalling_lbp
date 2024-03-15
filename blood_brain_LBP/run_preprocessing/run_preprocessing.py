@@ -15,8 +15,13 @@ from rpy2.robjects.packages import importr
 
 from ..labels import QC_LABELS_SAMPLE
 from ..utils import QC_metrics_UMAP_plot, interactive_embedding
-from .doublets_detection import (doubletdetection_method, scdblfinder, scds,
-                                 scrublet, solo)
+from .doublets_detection import (
+    doubletdetection_method,
+    scdblfinder,
+    scds,
+    scrublet,
+    solo,
+)
 
 logging.getLogger().setLevel(logging.INFO)
 FORMAT = "%(message)s"

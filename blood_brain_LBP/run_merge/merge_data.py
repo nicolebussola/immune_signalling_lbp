@@ -105,9 +105,7 @@ def run_merge(
 
     log.critical("Data Filtering")
 
-    t_mito = (
-        20 if tissue == "blood" else 20
-    )  
+    t_mito = 20 if tissue == "blood" else 20
     adata_filtered = adata_merged[
         (adata_merged.obs["predicted_doublets_consensus"] == "False")
         & (adata_merged.obs["passed_qc"] == "True")
@@ -119,7 +117,6 @@ def run_merge(
     log.info(f"Merged data after filtering: {adata_filtered.shape}")
 
     del adata_merged
-
 
     adata_filtered.X = adata_filtered.layers["counts"].copy()
 
@@ -204,7 +201,7 @@ def run_merge(
         adata_hvg = adata_filtered[:, adata_filtered.var["highly_variable"]].copy()
 
     if method_hvg == "HighlyDeviant":
-        batches = ro.FactorVector(adata_filtered.obs["pt"])
+        batches = ro.FactorVector(adata_filtered.obs.get("pt"))
 
         dfs = ro.r(
             """
@@ -215,7 +212,7 @@ def run_merge(
         )
 
         adata_filtered_dev = adata_filtered.copy()
-        adata_filtered_dev.obs = adata_filtered_dev.obs[["pt", "side"]]
+        adata_filtered_dev.obs = adata_filtered_dev.obs.get(["pt", "side"])
         binomial_deviance = ro.globalenv["f"](adata_filtered_dev, batches).T
 
         idx = binomial_deviance.argsort()[-n_top_genes:]
@@ -327,8 +324,7 @@ def run_merge(
             fname=output_path_plot
             / f"merged_{tissue}_cellbender_QC_filtered_{n_top_genes}{method_hvg}_harmonyPtSide_{timestamp}_{t_mito}.html",
         )
-    import ipdb
-    ipdb.set_trace()
+
     log.info("ScVI integration")
     adata_scvi = adata_hvg.copy()
 

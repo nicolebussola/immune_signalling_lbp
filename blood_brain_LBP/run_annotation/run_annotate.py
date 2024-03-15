@@ -12,8 +12,12 @@ from celltypist import models
 from rich.logging import RichHandler
 from rpy2.robjects.packages import importr
 
-from ..labels import (CHEMISTRY_V2_PATIENTS, FAILED_QC_SAMPLES,
-                      QC_LABELS_BATCH_1, QC_LABELS_BATCH_2)
+from ..labels import (
+    CHEMISTRY_V2_PATIENTS,
+    FAILED_QC_SAMPLES,
+    QC_LABELS_BATCH_1,
+    QC_LABELS_BATCH_2,
+)
 from ..utils import gridlayout
 
 importr("scry")

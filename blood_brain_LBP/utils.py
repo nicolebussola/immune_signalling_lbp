@@ -4,9 +4,16 @@ import os
 import numpy as np
 import pandas as pd
 from bokeh.layouts import column, grid, layout, row
-from bokeh.models import (CDSView, ColorBar, ColumnDataSource, CustomJS,
-                          CustomJSFilter, Label, LinearColorMapper,
-                          RangeSlider)
+from bokeh.models import (
+    CDSView,
+    ColorBar,
+    ColumnDataSource,
+    CustomJS,
+    CustomJSFilter,
+    Label,
+    LinearColorMapper,
+    RangeSlider,
+)
 from bokeh.palettes import Viridis256
 from bokeh.plotting import figure, output_file, show
 
