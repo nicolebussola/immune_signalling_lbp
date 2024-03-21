@@ -1,9 +1,7 @@
 import doubletdetection
 import rpy2.robjects as ro
-import scanpy as sc
+import scrublet as scr
 import scvi
-
-
 from rpy2.robjects.packages import importr
 
 importr("Seurat")
@@ -16,9 +14,9 @@ importr("scds")
 
 def scdblfinder(adata):
     data_mat = adata.X.T.copy()
-    scdblfinder = ro.r(
+    ro.r(
         """
-        f <- function(data_mat){
+        scDblFinder_score <- function(data_mat){
         set.seed(42)
         sce = scDblFinder(
             SingleCellExperiment(
@@ -26,27 +24,40 @@ def scdblfinder(adata):
             )
         )
         doublet_score = sce$scDblFinder.score
-        doublet_class = sce$scDblFinder.class
-        return(list(doublet_score, doublet_class))}
+        return(doublet_score)}
             """
     )
-
-    doublet_results = scdblfinder(data_mat)
-    adata.obs["scDblFinder_score"] = doublet_results[0]
-    adata.obs["scDblFinder_class"] = doublet_results[1]
-    adata.obs["scDblFinder_class"] = adata.obs["scDblFinder_class"].astype("object")
+    ro.r(
+        """
+        scDblFinder_class <- function(data_mat){
+        set.seed(42)
+        sce = scDblFinder(
+            SingleCellExperiment(
+                list(counts=data_mat),
+            )
+        )
+        doublet_class = sce$scDblFinder.class
+        return(doublet_class)}
+            """
+    )
+    adata.obs["doublet_scores_scdblfinder"] = ro.globalenv["scDblFinder_score"](
+        data_mat
+    )
+    adata.obs["predicted_doublets_scdblfinder"] = ro.globalenv["scDblFinder_class"](
+        data_mat
+    ).astype("object")
     return adata
 
 
-def scrublet(adata, seed=42):
-    sc.external.pp.scrublet(adata, random_state=seed)
-    adata.obs.rename(
-        columns={
-            "doublet_score": "doublet_scores_scrublet",
-            "predicted_doublet": "predicted_doublets_scrublet",
-        },
-        inplace=True,
+def scrublet(adata):
+    dbl_rate = adata.X.shape[0] / 1000 * 0.008  # from demuxify
+    scrub = scr.Scrublet(adata.X, expected_doublet_rate=dbl_rate, sim_doublet_ratio=2)
+    doublet_scores, predicted_doublets = scrub.scrub_doublets(
+        min_counts=3, min_cells=3, min_gene_variability_pctl=85, n_prin_comps=30
     )
+
+    adata.obs["doublet_scores_scrublet"] = doublet_scores
+    adata.obs["predicted_doublets_scrublet"] = predicted_doublets
     return adata
 
 
@@ -54,7 +65,7 @@ def scds(adata):
     data_mat = adata.X.T.copy()
     scds = ro.r(
         """
-        f <- function(data_mat){
+        scds <- function(data_mat){
         set.seed(42)
         sce = cxds(SingleCellExperiment(
                 list(counts=data_mat),
@@ -64,7 +75,7 @@ def scds(adata):
         }
         """
     )
-    doublet_results = scds(data_mat)
+    doublet_results = ro.globalenv["scds"](data_mat)
     adata.obs["predicted_doublets_scds"] = list(doublet_results.obs["hybrid_call"])
     adata.obs["doublet_scores_scds"] = list(doublet_results.obs["hybrid_score"])
     return adata

@@ -12,15 +12,16 @@ from rich.console import Console
 from rich.logging import RichHandler
 from rich.table import Table
 from rpy2.robjects.packages import importr
-from .doublets_detection import (
-    scdblfinder,
-    scrublet,
-    scds,
-    doubletdetection_method,
-    solo,
-)
+
 from ..labels import QC_LABELS_SAMPLE
 from ..utils import QC_metrics_UMAP_plot, interactive_embedding
+from .doublets_detection import (
+    doubletdetection_method,
+    scdblfinder,
+    scds,
+    scrublet,
+    solo,
+)
 
 logging.getLogger().setLevel(logging.INFO)
 FORMAT = "%(message)s"
@@ -44,12 +45,22 @@ importr("scry")
 np.random.seed(42)
 
 
+def doublet_methods_decision(adata):
+    if adata.shape[0] < 2000:
+        return ["scrublet", "scds", "scdblfinder"]  ### Missing doubletfinder!!
+    elif adata.shape[0] >= 2000 and adata.shape[0] <= 10000:
+        return ["scds", "scdblfinder"]
+    elif adata.shape[0] > 10000 and adata.shape[0] < 20000:
+        return ["scrublet", "scds", "scdblfinder", "doubletdetection"]
+    else:
+        return ["scrublet", "scds", "solo", "doubletdetection"]
+
+
 def run_preprocessing(
     input_path,
     output_path_plot,
     tissue,
     n_top_genes,
-    doublet_methods_sequence,
     save_plots,
 ):
     log.critical(f"Tissue: {tissue}")
@@ -69,7 +80,7 @@ def run_preprocessing(
             patient_path = data_path / f"{PT}-{tissue}-{side}"
 
             try:
-                h5_name = f"{PT}-{side}-B_CellBender_filtered.h5"
+                h5_name = f"{PT}-{side}-CellBender_filtered.h5"
 
                 log.info(f"File name: {h5_name}")
 
@@ -125,16 +136,38 @@ def run_preprocessing(
                     "solo": (solo, [adata]),
                 }
 
-                log.info(f"{doublet_methods_sequence}")
+                doublet_methods_sequence = doublet_methods_decision(adata)
+
+                log.critical(f"{adata.shape} shape: {doublet_methods_sequence}")
                 for f in doublet_methods_sequence:
+                    log.info(f"Method {f}")
                     adata = doublets_methods[f][0](*doublets_methods[f][1])
+                    pred_col = adata.obs[f"predicted_doublets_{f}"]
+                    if f == "doubletdetection":
+                        adata.obs[f"predicted_doublets_{f}"] = pred_col.astype(float)
+                    elif f in ["solo", "scdblfinder"]:
+                        adata.obs[f"predicted_doublets_{f}"] = pred_col.map(
+                            {"singlet": 0, "doublet": 1}
+                        )
+
+                    adata.obs[f"predicted_doublets_{f}"] = adata.obs[
+                        f"predicted_doublets_{f}"
+                    ].astype(int)
+
+                adata.obs["predicted_doublets_consensus"] = (
+                    adata.obs[
+                        [c for c in adata.obs.columns if "predicted_doublets" in c]
+                    ]
+                    .all(axis=1)
+                    .astype(str)
+                )
 
                 table = Table()
                 table.add_column("Method")
                 table.add_column("singlet")
                 table.add_column("doublet")
 
-                for method in doublet_methods_sequence:
+                for method in doublet_methods_sequence + ["consensus"]:
                     try:
                         doublets_count = (
                             adata.obs[f"predicted_doublets_{method}"]
@@ -154,12 +187,12 @@ def run_preprocessing(
                 log.info(f"Highly deviant feature selection, top {n_top_genes} genes")
                 dfs = ro.r(
                     """
-                    f <- function(adata){
+                    g <- function(adata){
                     sce=devianceFeatureSelection(adata, assay="X")
                     return(rowData(sce)$binomial_deviance)}
                     """
                 )
-                binomial_deviance = dfs(adata).T
+                binomial_deviance = ro.globalenv["g"](adata).T
                 idx = binomial_deviance.argsort()[-n_top_genes:]
                 mask = np.zeros(adata.var_names.shape, dtype=bool)
                 mask[idx] = True
@@ -195,7 +228,7 @@ def run_preprocessing(
                 adata.obs.index = [s.split("-")[0] for s in list(adata.obs.index)]
 
                 log.info(
-                    f"adata shape: {len(set(adata.obs.index))}, ddqc_obs sgape: {len(set(ddqc_obs.index))}"
+                    f"adata shape: {len(set(adata.obs.index))}, ddqc_obs shape: {len(set(ddqc_obs.index))}"
                 )
                 adata = adata[
                     ~adata.obs.index.isin(
@@ -219,12 +252,15 @@ def run_preprocessing(
                 adata.obs["cluster_labels"] = adata.obs["cluster_labels"].astype("str")
                 adata.obs["passed_qc"] = adata.obs["passed_qc"].astype("str")
                 adata.obs["side"] = side
+                metrics = QC_LABELS_SAMPLE + [
+                    c for c in adata.obs.columns if "doublet" in c
+                ]
 
-                sc.pl.umap(adata, color=QC_LABELS_SAMPLE)
+                sc.pl.umap(adata, color=metrics)
 
                 tabs = [
                     TabPanel(child=interactive_embedding(adata, label), title=label)
-                    for label in QC_LABELS_SAMPLE
+                    for label in metrics
                 ]
 
                 p = Tabs(tabs=tabs)

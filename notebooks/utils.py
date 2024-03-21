@@ -6,7 +6,7 @@ import pandas as pd
 from bokeh.layouts import column, grid, layout, row
 from bokeh.models import (CDSView, ColorBar, ColumnDataSource, CustomJS,
                           CustomJSFilter, Label, LinearColorMapper,
-                          RangeSlider)
+                          RangeSlider, Button)
 from bokeh.palettes import Viridis256
 from bokeh.plotting import figure, output_file, show
 from bokeh.transform import factor_mark

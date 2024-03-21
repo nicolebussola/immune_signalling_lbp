@@ -34,16 +34,15 @@ def get_parser():
         "-t",
         choices=["blood", "brain"],
         type=str,
-        default="blood",
-        help="Type of tissue (brain or blood), default: blood.",
+        help="Type of tissue (brain or blood)",
     )
     parser.add_argument(
         "--method-hvg",
         "-m",
         choices=["HighlyDeviant", "cell_ranger", "HighlyDeviant_cr"],
         type=str,
-        default="cell_ranger",
-        help="Method for feature selection, default: cell_ranger.",
+        default="HighlyDeviant",
+        help="Method for feature selection, default: HighlyDeviant.",
     )
     parser.add_argument(
         "--n-top-genes",

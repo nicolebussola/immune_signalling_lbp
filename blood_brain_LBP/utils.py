@@ -4,9 +4,16 @@ import os
 import numpy as np
 import pandas as pd
 from bokeh.layouts import column, grid, layout, row
-from bokeh.models import (CDSView, ColorBar, ColumnDataSource, CustomJS,
-                          CustomJSFilter, Label, LinearColorMapper,
-                          RangeSlider)
+from bokeh.models import (
+    CDSView,
+    ColorBar,
+    ColumnDataSource,
+    CustomJS,
+    CustomJSFilter,
+    Label,
+    LinearColorMapper,
+    RangeSlider,
+)
 from bokeh.palettes import Viridis256
 from bokeh.plotting import figure, output_file, show
 
@@ -18,9 +25,6 @@ TOOLTIPS = [
     ("desc", "@desc"),
 ]
 TOOLS = "hover,crosshair,pan,wheel_zoom,zoom_in,zoom_out,box_zoom,undo,redo,reset,tap,save,box_select,poly_select,lasso_select,examine,help"
-
-QC_LABELS_CONT = QC_LABELS_SAMPLE[:-6]
-QC_LABELS_CAT = QC_LABELS_SAMPLE[-6:]
 
 
 class readable_directory(argparse.Action):
@@ -34,31 +38,40 @@ class readable_directory(argparse.Action):
             raise argparse.ArgumentTypeError(f"Directory: {_dir} is not a readable")
 
 
+def detect_column_type(column, threshold=10):
+    unique_values = column.unique()
+    num_unique = len(unique_values)
+
+    if num_unique <= threshold:
+        return "Discrete"
+    return "Numeric"
+
+
 def QC_metrics_UMAP_plot(adata):
     embedding = np.array(adata.obsm[f"X_umap"].astype(float))
 
     samples = np.array(list(adata.obs.index))
     extracted_fields = {}
-
-    for label in QC_LABELS_CONT:
-        extracted_fields[label] = adata.obs[label].values.astype(float)
-    for label in QC_LABELS_CAT:
-        extracted_fields[label] = adata.obs[label].values.astype("str")
+    metrics = QC_LABELS_SAMPLE + [c for c in adata.obs.columns if "doublet" in c]
+    for label in metrics:
+        adata_col = adata.obs[label]
+        col_type = detect_column_type(adata_col)
+        if col_type == "Numeric":
+            extracted_fields[label] = adata_col.values.astype(float)
+        else:
+            extracted_fields[label] = adata_col.values.astype("str")
 
     data_arrays = (
         [embedding]
         + [np.expand_dims(samples, axis=1)]
-        + [
-            np.expand_dims(extracted_fields[field], axis=1)
-            for field in QC_LABELS_CONT + QC_LABELS_CAT
-        ]
+        + [np.expand_dims(extracted_fields[field], axis=1) for field in metrics]
     )
 
     data = np.hstack(data_arrays)
 
     df = pd.DataFrame(
         data,
-        columns=["x", "y", "sample"] + QC_LABELS_CONT + QC_LABELS_CAT,
+        columns=["x", "y", "sample"] + metrics,
     )
 
     df["x"] = pd.to_numeric(df["x"])
@@ -92,6 +105,9 @@ def QC_metrics_UMAP_plot(adata):
   
     """
     sliders = []
+    QC_LABELS_CONT = [
+        label for label in metrics if detect_column_type(adata.obs[label]) == "Numeric"
+    ]
     for col_name in QC_LABELS_CONT:
         min_val = min(df[col_name].astype(float))
         max_val = max(df[col_name].astype(float))
