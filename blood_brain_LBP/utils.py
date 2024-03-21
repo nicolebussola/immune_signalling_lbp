@@ -44,8 +44,7 @@ def detect_column_type(column, threshold=10):
 
     if num_unique <= threshold:
         return "Discrete"
-    else:
-        return "Numeric"
+    return "Numeric"
 
 
 def QC_metrics_UMAP_plot(adata):
