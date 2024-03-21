@@ -47,8 +47,7 @@ timestamp = datetime.datetime.now().strftime("%m%d")
 def convert_to_categorical(column, threshold_unique_values=15):
     if column.nunique() < threshold_unique_values:
         return column.astype("category")
-    else:
-        return column
+    return column
 
 
 def run_merge(
