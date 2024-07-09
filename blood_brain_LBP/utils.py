@@ -178,14 +178,22 @@ def QC_metrics_UMAP_plot(adata):
 
 
 def interactive_embedding(
-    adata, label, embedding_method="umap", width=900, height=900, labels_loc="outside"
+    adata,
+    label,
+    embedding_method="umap",
+    width=900,
+    height=900,
+    labels_loc="outside",
+    palette_cont=Viridis256,
+    title_font_size="25px",
 ):
     """plot interactive plot for scRNA data
 
     Args:
         adata (AnnData): scanpy AnnData object. Must have the "tissue" (blood/brain) in adata.obs
-        embedding_method (string): name of embedding vectors in adata.obsm, e.g. UMAP
         label (str): target to color the points
+        embedding_method (string): name of embedding vectors in adata.obsm, e.g. UMAP
+
 
     Returns:
         bokeh.plotting._figure.figure: interactive embedding plot colored by label
@@ -204,16 +212,12 @@ def interactive_embedding(
 
     p.title.align = "center"
     p.title.text_color = "black"
-    p.title.text_font_size = "25px"
+    p.title.text_font_size = title_font_size
 
     # categorical label
     if f"{label}_colors" in list(adata.uns.keys()):
         mycols = adata.uns[f"{label}_colors"]
-
-        try:
-            myclasses = sorted(pd.unique(adata.obs[label]), key=int)
-        except ValueError:
-            myclasses = pd.unique(adata.obs[label])
+        myclasses = adata.obs[label].unique().categories
         for col, theclass in zip(mycols, myclasses):
             idx = np.where(np.array(list(adata.obs[label])) == str(theclass))[
                 0
@@ -278,7 +282,7 @@ def interactive_embedding(
         """
         field = adata.obs[label].values.astype(float)
         colormapper = LinearColorMapper(
-            palette=Viridis256, low=min(field), high=max(field)
+            palette=palette_cont, low=min(field), high=max(field)
         )
         smp = np.expand_dims(samples, axis=1)
         data = np.hstack((embedding, smp, np.expand_dims(field, axis=1)))
@@ -291,7 +295,7 @@ def interactive_embedding(
             start=min(field),
             end=max(field),
             value=(min(field), max(field)),
-            step=0.1,
+            step=0.05,
             title="Value",
         )
         callback = CustomJS(
