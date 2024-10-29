@@ -1,21 +1,19 @@
 import argparse
 import os
+import textwrap
 
+import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
 import pandas as pd
 from bokeh.layouts import column, grid, layout, row
-from bokeh.models import (
-    CDSView,
-    ColorBar,
-    ColumnDataSource,
-    CustomJS,
-    CustomJSFilter,
-    Label,
-    LinearColorMapper,
-    RangeSlider,
-)
+from bokeh.models import (CDSView, ColorBar, ColumnDataSource, CustomJS,
+                          CustomJSFilter, Label, LinearColorMapper,
+                          RangeSlider)
 from bokeh.palettes import Viridis256
 from bokeh.plotting import figure, output_file, show
+from gseapy import enrichment_map
+from matplotlib.colors import Normalize
 
 from .labels import QC_LABELS_SAMPLE
 
@@ -354,3 +352,69 @@ def gridlayout(
         output_file(fname)
 
     show(grid(ps, ncols=ncols))
+
+
+def nudge_positions(pos, x_shift=0, y_shift=0.07):
+    """Adjust node positions for better visualization."""
+    return {node: (x + x_shift, y + y_shift) for node, (x, y) in pos.items()}
+
+
+def wrap_text(text, width=30):
+    """Wrap text to a specified width."""
+    return "\n".join(
+        textwrap.wrap(text, width=width, break_long_words=False, break_on_hyphens=False)
+    )
+
+
+def plot_pathway_network(paths_df, title, output_path, top_term=20):
+    """Plot and save the pathway network based on enrichment map."""
+    paths_df["Combined Score"] = (
+        paths_df["Combined Score_x"] + paths_df["Combined Score_y"]
+    ) / 2
+    norm = Normalize(
+        vmin=paths_df["Combined Score"].min(), vmax=paths_df["Combined Score"].max()
+    )
+    paths_df["Combined Score norm"] = norm(paths_df["Combined Score"])
+    paths_df["Term"] = paths_df["Term"].apply(wrap_text)
+
+    nodes, edges = enrichment_map(paths_df.reset_index(), top_term=top_term)
+    G = nx.from_pandas_edgelist(
+        edges,
+        source="src_idx",
+        target="targ_idx",
+        edge_attr=["jaccard_coef", "overlap_coef", "overlap_genes"],
+    )
+
+    for idx, (term, score) in enumerate(zip(nodes["Term"], nodes["Combined Score"])):
+        G.add_node(idx, term=term, score=score)
+
+    norm_scores = norm([G.nodes[node]["score"] for node in G.nodes()])
+    cmap = plt.cm.viridis
+    colors = cmap(norm_scores)
+
+    pos = nx.spring_layout(G, k=1, iterations=50)
+    pos_nodes = nudge_positions(pos)
+
+    fig, ax = plt.subplots(figsize=(30, 20))
+
+    nx.draw_networkx_nodes(
+        G, pos=pos, cmap=cmap, node_color=colors, alpha=1, node_size=500
+    )
+    nx.draw_networkx_labels(
+        G,
+        pos=pos_nodes,
+        font_size=14,
+        labels={i: G.nodes[i]["term"] for i in G.nodes()},
+    )
+    nx.draw_networkx_edges(
+        G,
+        pos=pos,
+        width=[10 * w for w in nx.get_edge_attributes(G, "jaccard_coef").values()],
+        edge_color="#CDDBD4",
+    )
+
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    plt.colorbar(sm, ax=ax, label="Combined Score norm")
+    plt.title(title, fontsize=20)
+    plt.savefig(output_path)
