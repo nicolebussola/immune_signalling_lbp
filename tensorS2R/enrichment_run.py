@@ -4,7 +4,7 @@ import warnings
 from pathlib import Path
 
 import cell2cell as c2c
-from lr_loadings_utils import (
+from .lr_loadings_utils import (
     enr_df,
     filter_and_process_de,
     filter_lr,
@@ -366,21 +366,22 @@ def enrich_mono_micro_blood_brain(
 
     mono_ligands_bl = set(mono_ligands_bl_[0]) | set(mono_ligands_bl_[1])
 
-    mo2mi_sender_cells_ = factors["Receiver Cells"][mo2mi_factor] > 0.05
-    mo2mi_sender_cells = mo2mi_sender_cells_[mo2mi_sender_cells_].index.tolist()
+    mo2mi_receiver_cells_ = factors["Receiver Cells"][mo2mi_factor] > 0.05
+    mo2mi_receiver_cells = mo2mi_receiver_cells_[mo2mi_receiver_cells_].index.tolist()
 
     if any(
         "brain" in sub
-        for sub in [g for g in mo2mi_sender_cells if "Monocytes" not in g]
+        for sub in [g for g in mo2mi_receiver_cells if "Monocytes" not in g]
     ):
-        target_cells_tf = [f.split("_")[0] for f in mo2mi_sender_cells if "brain" in f]
-        mono_ligands = []
+        target_cells_tf = [f.split("_")[0] for f in mo2mi_receiver_cells if "brain" in f]
+        mono_ligands_ = []
         for k in ["CD16", "CD14"]:
             ddf = ranked_genes_df(adata_tf, mono_ligands_bl, key=k)
             ligands = filter_and_process_de(ddf, target_cells_tf)
-            mono_ligands.append(ligands)
+            mono_ligands_.append(ligands)
+        mono_ligands = list(set(mono_ligands_[0]) | set(mono_ligands_[1]))
     else:
-        mono_ligands = mono_ligands_bl
+        mono_ligands = list(mono_ligands_bl)
 
     all_receptors = get_unique_receptors(lr_loads_mono_to_micro, mono_ligands)
 
@@ -457,13 +458,14 @@ def enrich_mono_micro_blood_brain(
         target_cells_tf = [
             f.split("_")[0] for f in mi2mo_receiver_cells_no_mono if "brain" in f
         ]
-        mono_receptors = []
+        mono_receptors_ = []
         for k in ["CD16", "CD14"]:
             ddf = ranked_genes_df(adata_tf, mono_receptors_bl, key=k)
             receptors = filter_and_process_de(ddf, target_cells_tf)
-            mono_receptors.append(receptors)
+            mono_receptors_.append(receptors)
+        mono_receptors = list(set(mono_receptors_[0]) | set(mono_receptors_[1]))
     else:
-        mono_receptors = mono_receptors_bl
+        mono_receptors = list(mono_receptors_bl)
 
     lr_loads_micro_to_mono_filtered = filter_lr(
         lr_loads_micro_to_mono, micro_ligands, mono_receptors

@@ -7,8 +7,8 @@ import scanpy as sc
 from bokeh.palettes import Inferno256
 from bokeh.plotting import show
 
-from adata_processing_utils import filter_adata, load_brain_blood_data
-from plot_utils import interactive_embedding
+from .adata_processing_utils import filter_adata, load_brain_blood_data
+from .plot_utils import interactive_embedding
 
 msigdb = dc.get_resource("MSigDB")
 
@@ -125,7 +125,7 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "-t", "--threshold_targets", help="decoupler ORA threshold", type=float, default=0.05
+        "-t", "--threshold_targets", help="decoupler ORA threshold", type=float, default=0.1
     )
 
     args = parser.parse_args()

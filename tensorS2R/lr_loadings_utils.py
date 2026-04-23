@@ -416,25 +416,37 @@ def get_expressed_genes(adata, cell_type_col, cell_type, expr_prop=0.1):
     return stats["genes"].values
 
 
-def get_mean_expression(pdata, cell_type, celltype_col):
+def get_mean_expression(pdata, cell_type, celltype_col, sample_key=None):
     """
     Get the mean expression of all genes in a specific cell type.
+
+    If sample_key is provided, computes pseudo-bulk mean: sum counts per participant
+    per cell type, then average across participants (matching paper Step 4 methods).
+    If sample_key is None, computes the direct cell-level mean.
 
     Parameters:
     pdata (AnnData): The annotated data matrix.
     cell_type (str): The cell type for which to calculate the mean gene expression.
-    celltype_col (str): The cell type columnn in adata.obs to group.
+    celltype_col (str): The cell type column in adata.obs to group.
+    sample_key (str, optional): Column in adata.obs identifying participants.
 
     Returns:
     pd.DataFrame: A DataFrame containing the mean expression of all genes in the specified cell type.
     """
-    df_c = pd.DataFrame(pdata[pdata.obs[celltype_col] == cell_type].X.mean(axis=0)).T
-    df_c.columns = list(pdata.var_names)
-    df_c = df_c.rename(index={0: cell_type})
+    sub = pdata[pdata.obs[celltype_col] == cell_type]
+    if sample_key is not None:
+        X = sub.X if not hasattr(sub.X, "toarray") else sub.X.toarray()
+        df_sub = pd.DataFrame(X, columns=sub.var_names, index=sub.obs[sample_key])
+        pb = df_sub.groupby(level=0).sum().mean(axis=0)
+        df_c = pb.to_frame().T
+    else:
+        df_c = pd.DataFrame(sub.X.mean(axis=0)).T
+        df_c.columns = list(pdata.var_names)
+    df_c = df_c.rename(index={df_c.index[0]: cell_type})
     return df_c
 
 
-def compute_prod_dict(lr_pairs, pdata, df_micro, celltype_col, is_ligand=True):
+def compute_prod_dict(lr_pairs, pdata, df_micro, celltype_col, is_ligand=True, sample_key=None):
     """
     Compute the product expression for ligand-receptor or receptor-ligand pairs.
 
@@ -442,8 +454,9 @@ def compute_prod_dict(lr_pairs, pdata, df_micro, celltype_col, is_ligand=True):
     lr_pairs (list): List of ligand-receptor pairs.
     pdata (AnnData): The annotated data matrix.
     df_micro (pd.DataFrame): DataFrame containing microarray data.
-    celltype_col (str): The cell type columnn in adata.obs to group.
+    celltype_col (str): The cell type column in adata.obs to group.
     is_ligand (bool): Flag to indicate if the computation is for ligand (True) or receptor (False).
+    sample_key (str, optional): Participant column for pseudo-bulk aggregation (paper Step 4).
 
     Returns:
     dict: Dictionary with the product of ligand and receptor expressions for each cell type.
@@ -455,7 +468,7 @@ def compute_prod_dict(lr_pairs, pdata, df_micro, celltype_col, is_ligand=True):
         ligand, receptor = lr_pair.split("^")
         prod_dict[lr_pair] = {}
         for cell_type in cell_types:
-            df_c = get_mean_expression(pdata, cell_type, celltype_col)
+            df_c = get_mean_expression(pdata, cell_type, celltype_col, sample_key=sample_key)
             if is_ligand:
                 prod_dict[lr_pair][cell_type] = df_micro[ligand][0] * df_c[receptor][0]
             else:

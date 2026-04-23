@@ -105,7 +105,7 @@ def load_brain_blood_data(cohort, project_path):
     return blood_adata, brain_adata, blood_adata_hvg, brain_adata_hvg
 
 
-def filter_adata(adata, hvg_adata, thresh_count=7, min_cells=100):
+def filter_adata(adata, hvg_adata, thresh_count=6.908, min_cells=100):
     """
     Filter AnnData object based on total counts and cell type occurrences.
 
@@ -161,7 +161,7 @@ def create_blood_brain_tf(cohort, project_path, write=False, micro_only=True):
         brain_type = "brain"
 
     common_genes = set(brain_adata_filt.var.index).intersection(
-        brain_adata_filt.var.index
+        blood_adata_filt.var.index
     )
 
     blood_adata_filt_common = blood_adata_filt[
