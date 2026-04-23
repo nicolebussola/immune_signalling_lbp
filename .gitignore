@@ -163,8 +163,8 @@ cython_debug/
 *.h5ad
 *.png
 *.key
+*.sh
 notebooks
 preprocessing/run_unmix_samples/
-cellbender_run.sh
 sc-type.R
 preprocessing/immune_markers_blood.py
