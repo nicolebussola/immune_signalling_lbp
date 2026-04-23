@@ -9,12 +9,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import tensorly as tl
-from adata_processing_utils import (
+from .adata_processing_utils import (
     create_blood_brain_tf,
     filter_and_process_anno_adata,
     load_brain_blood_data,
 )
-from lr_loadings_utils import find_threshold_loadings
+from .lr_loadings_utils import find_threshold_loadings
 from tqdm import tqdm
 
 warnings.filterwarnings("ignore")

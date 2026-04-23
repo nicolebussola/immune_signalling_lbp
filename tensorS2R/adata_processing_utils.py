@@ -161,7 +161,7 @@ def create_blood_brain_tf(cohort, project_path, write=False, micro_only=True):
         brain_type = "brain"
 
     common_genes = set(brain_adata_filt.var.index).intersection(
-        brain_adata_filt.var.index
+        blood_adata_filt.var.index
     )
 
     blood_adata_filt_common = blood_adata_filt[
