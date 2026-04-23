@@ -118,22 +118,25 @@ def run_tensorcell2cell(
     )
 
     if factorization_rank is None:
-        print("Compute rank")
-        tensor.to_device(device)
-        fig, error = tensor.elbow_rank_selection(
-            upper_rank=25,
-            runs=100,
-            init="random",
-            svd="numpy_svd",
-            automatic_elbow=True,
-            metric="error",
-            random_state=0,
-            fontsize=14,
-            filename=str(output_path),
-            tol=1e-8,
-            n_iter_max=500,
-        )
-        factorization_rank = tensor.rank
+        if len(target_celltypes) > 7:
+            factorization_rank = 20
+        else:
+            print("Compute rank")
+            tensor.to_device(device)
+            fig, error = tensor.elbow_rank_selection(
+                upper_rank=25,
+                runs=100,
+                init="random",
+                svd="numpy_svd",
+                automatic_elbow=True,
+                metric="error",
+                random_state=0,
+                fontsize=14,
+                filename=str(output_path),
+                tol=1e-8,
+                n_iter_max=500,
+            )
+            factorization_rank = tensor.rank
 
     output_folder = output_path / f"rank_{factorization_rank}" / merging_mode / groupby
     os.makedirs(output_folder, exist_ok=True)

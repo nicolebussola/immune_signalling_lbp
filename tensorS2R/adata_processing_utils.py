@@ -105,7 +105,7 @@ def load_brain_blood_data(cohort, project_path):
     return blood_adata, brain_adata, blood_adata_hvg, brain_adata_hvg
 
 
-def filter_adata(adata, hvg_adata, thresh_count=7, min_cells=100):
+def filter_adata(adata, hvg_adata, thresh_count=6.908, min_cells=100):
     """
     Filter AnnData object based on total counts and cell type occurrences.
 
