@@ -209,11 +209,7 @@ def interactive_embedding(
     # categorical label
     if f"{label}_colors" in list(adata.uns.keys()):
         mycols = adata.uns[f"{label}_colors"]
-
-        try:
-            myclasses = sorted(pd.unique(adata.obs[label]), key=int)
-        except ValueError:
-            myclasses = pd.unique(adata.obs[label])
+        myclasses = adata.obs[label].unique().categories
         for col, theclass in zip(mycols, myclasses):
             idx = np.where(np.array(list(adata.obs[label])) == str(theclass))[
                 0
@@ -278,7 +274,7 @@ def interactive_embedding(
         """
         field = adata.obs[label].values.astype(float)
         colormapper = LinearColorMapper(
-            palette=Viridis256, low=min(field), high=max(field)
+            palette=palette_cont, low=min(field), high=max(field)
         )
         smp = np.expand_dims(samples, axis=1)
         data = np.hstack((embedding, smp, np.expand_dims(field, axis=1)))
@@ -291,7 +287,7 @@ def interactive_embedding(
             start=min(field),
             end=max(field),
             value=(min(field), max(field)),
-            step=0.1,
+            step=0.05,
             title="Value",
         )
         callback = CustomJS(
