@@ -54,52 +54,52 @@ relevant_obs_columns = [
 ]
 
 
-ADATA_BATCH_1_BLOOD_HVG = (
-    "batch_1_blood_filtered_4000HighlyDeviant_20_harmony_annotated.h5ad"
+ADATA_COHORT_1_BLOOD_HVG = (
+    "cohort_1_blood_filtered_4000HighlyDeviant_20_harmony_annotated.h5ad"
 )
-ADATA_BATCH_1_BRAIN_HVG = (
-    "batch_1_brain_filtered_4000HighlyDeviant_20_harmony_regressedScaled.h5ad"
+ADATA_COHORT_1_BRAIN_HVG = (
+    "cohort_1_brain_filtered_4000HighlyDeviant_20_harmony_regressedScaled.h5ad"
 )
 
-ADATA_BATCH_2_BLOOD_HVG = (
-    "batch_2_blood_filtered_4000HighlyDeviant_20_filt15_scanvi_annotated.h5ad"
+ADATA_COHORT_2_BLOOD_HVG = (
+    "cohort_2_blood_filtered_4000HighlyDeviant_20_filt15_scanvi_annotated.h5ad"
 )
-ADATA_BATCH_2_BRAIN_HVG = (
-    "batch_2_brain_filtered_4000HighlyDeviant_20_harmony_scaled.h5ad"
+ADATA_COHORT_2_BRAIN_HVG = (
+    "cohort_2_brain_filtered_4000HighlyDeviant_20_harmony_scaled.h5ad"
 )
-BATCH_2_BRAIN_ANNOTATIONS_PATH = "/sc/arion/work/busson02/LBP/annotations/batch_2_brain_filtered_4000HighlyDeviant_20_harmony_scaled.csv"
+COHORT_2_BRAIN_ANNOTATIONS_PATH = "/sc/arion/work/busson02/LBP/annotations/cohort_2_brain_filtered_4000HighlyDeviant_20_harmony_scaled.csv"
 
 
-def load_brain_blood_data(batch, project_path):
+def load_brain_blood_data(cohort, project_path):
     """
-    Load brain and blood data for a specific batch;
+    Load brain and blood data for a specific cohort;
     both data for full genes and and highly variable genes are loaded.
 
     Parameters:
-    batch (str): The batch identifier (e.g., 'batch_1', 'batch_2').
+    cohort (str): The cohort identifier (e.g., 'cohort_1', 'cohort_2').
     project_path (Path): Path to the project directory.
 
     Returns:
     tuple: Processed AnnData objects for blood and brain data (blood_adata, brain_adata, blood_adata_hvg, brain_adata_hvg).
     """
-    data_path = project_path / batch
-    blood_adata = sc.read(data_path / f"{batch}_blood_filtered_20.h5ad")
-    brain_adata = sc.read(data_path / f"{batch}_brain_filtered_20.h5ad")
+    data_path = project_path / cohort
+    blood_adata = sc.read(data_path / f"{cohort}_blood_filtered_20.h5ad")
+    brain_adata = sc.read(data_path / f"{cohort}_brain_filtered_20.h5ad")
 
-    if batch == "batch_1":
-        blood_adata_hvg = sc.read(data_path / ADATA_BATCH_1_BLOOD_HVG)
-        brain_adata_hvg = sc.read(data_path / ADATA_BATCH_1_BRAIN_HVG)
-    elif batch == "batch_2":
-        blood_adata_hvg = sc.read(data_path / ADATA_BATCH_2_BLOOD_HVG)
+    if cohort == "cohort_1":
+        blood_adata_hvg = sc.read(data_path / ADATA_COHORT_1_BLOOD_HVG)
+        brain_adata_hvg = sc.read(data_path / ADATA_COHORT_1_BRAIN_HVG)
+    elif cohort == "cohort_2":
+        blood_adata_hvg = sc.read(data_path / ADATA_COHORT_2_BLOOD_HVG)
         blood_adata_hvg = blood_adata_hvg[
             ~blood_adata_hvg.obs["cell_type"].isin(["low count", "unknown"])
         ].copy()
         blood_adata_hvg.obs = blood_adata_hvg.obs.set_index("Unnamed: 0")
-        brain_adata_hvg = sc.read(data_path / ADATA_BATCH_2_BRAIN_HVG)
+        brain_adata_hvg = sc.read(data_path / ADATA_COHORT_2_BRAIN_HVG)
         brain_adata_hvg.obs["cell_type"] = list(
-            pd.read_csv(BATCH_2_BRAIN_ANNOTATIONS_PATH)["cell_type"]
+            pd.read_csv(COHORT_2_BRAIN_ANNOTATIONS_PATH)["cell_type"]
         )
-        blood_adata.obs["batch"] = "batch_2"
+        blood_adata.obs["cohort"] = "cohort_2"
         blood_adata.obs["chemistry"] = "v3"
 
     return blood_adata, brain_adata, blood_adata_hvg, brain_adata_hvg
@@ -127,12 +127,12 @@ def filter_adata(adata, hvg_adata, thresh_count=7, min_cells=100):
     return adata_filt[adata_filt.obs.index.isin(hvg_filt.obs.index)].copy()
 
 
-def create_blood_brain_tf(batch, project_path, write=False, micro_only=True):
+def create_blood_brain_tf(cohort, project_path, write=False, micro_only=True):
     """
     Create a combined AnnData object of blood and brain cells, and optionally write to file.
 
     Parameters:
-    batch (str): The batch identifier (e.g., 'batch_1', 'batch_2').
+    cohort (str): The cohort identifier (e.g., 'cohort_1', 'cohort_2').
     project_path (Path): Path to the project directory.
     write (bool, optional): Whether to write the processed AnnData to file. Default is False.
     micro_only (bool, optional): Keep only Microglia cells in brain data.
@@ -141,7 +141,7 @@ def create_blood_brain_tf(batch, project_path, write=False, micro_only=True):
     AnnData or None: Combined AnnData object if write is False, otherwise None.
     """
     blood_adata, brain_adata, blood_adata_hvg, brain_adata_hvg = load_brain_blood_data(
-        batch, project_path
+        cohort, project_path
     )
     blood_adata_filt = filter_adata(blood_adata, blood_adata_hvg)
     del blood_adata
@@ -223,11 +223,11 @@ def create_blood_brain_tf(batch, project_path, write=False, micro_only=True):
     adata.layers["log1p_norm"] = sc.pp.log1p(scales_counts["X"], copy=True)
 
     if write:
-        output_path = project_path / batch / "c2c_liana_outputs"
+        output_path = project_path / cohort / "c2c_liana_outputs"
         sc.write(output_path / f"blood_{brain_type}_tf.h5ad", adata)
         del adata
         gc.collect()
-        print(f"Processed {batch} and written to {output_path}")
+        print(f"Processed {cohort} and written to {output_path}")
     else:
         return adata
 
@@ -295,12 +295,12 @@ def scran_norm(adata, anno_col):
     return adata
 
 
-def prepare_scran_de_data_micro_mono(batch, project_path, anno_col_scran, anno_col_de):
+def prepare_scran_de_data_micro_mono(cohort, project_path, anno_col_scran, anno_col_de):
     """
     Prepare scran normalized data for differential expression analysis between Microglia and Monocytes.
 
     Parameters:
-    batch (str): The batch identifier (e.g., 'batch_1', 'batch_2').
+    cohort (str): The cohort identifier (e.g., 'cohort_1', 'cohort_2').
     project_path (Path): Path to the project directory.
     anno_col_scran (str): The annotation column to use for scran normalization.
     anno_col_de (str): The annotation column to use for differential expression analysis.
@@ -309,7 +309,7 @@ def prepare_scran_de_data_micro_mono(batch, project_path, anno_col_scran, anno_c
     tuple: Scran normalized AnnData objects for blood and brain data (adata_bl, adata_br).
     """
     blood_adata, brain_adata, blood_adata_hvg, brain_adata_hvg = load_brain_blood_data(
-        batch, project_path
+        cohort, project_path
     )
 
     adata_bl = scran_norm(

@@ -1,34 +1,25 @@
 import logging
 import os
 import warnings
+from pathlib import Path
 
 import cell2cell as c2c
-from enrichment_analysis_utils import enr_df, get_expressed_genes, process_common_paths
 from lr_loadings_utils import (
+    enr_df,
     filter_and_process_de,
     filter_lr,
     find_threshold_loadings,
+    get_expressed_genes,
     get_unique_receptors,
+    process_common_paths,
     process_de_genes_celltype,
     process_loadings,
     ranked_genes_df,
 )
 
-from utils import plot_pathway_network
 
 GSEA_DBS = ["WikiPathway_2023_Human", "Reactome_2022", "GO_Biological_Process_2023"]
-CUSTOM_PALETTE = {
-    "CD16.mono": "#6E82F7",
-    "CD14.mono": "#F2A55C",
-    "CD4.T": "#F4CED8",
-    "B.cells": "#8D4CF6",
-    "CD8.T": "#A9BE54",
-    "CD16.NK": "#85FCF2",
-    "NKT": "#EB4B9F",
-    "Platelets": "#C7FD7E",
-    "DC": "#EC6646",
-    "CD56+ NK cells": "#559FF8",
-}
+
 logging.disable(logging.WARNING)
 
 
@@ -37,28 +28,28 @@ warnings.filterwarnings("ignore")
 
 CELLS_FACTOR_DICT = {
     "micro_blood_coarse": {
-        "batch_1": {"Micro_to_Mono": "Factor 8", "Mono_to_Micro": "Factor 3"},
-        "batch_2": {"Micro_to_Mono": "Factor 5", "Mono_to_Micro": "Factor 3"},
+        "cohort_1": {"Micro_to_Mono": "Factor 8", "Mono_to_Micro": "Factor 3"},
+        "cohort_2": {"Micro_to_Mono": "Factor 5", "Mono_to_Micro": "Factor 3"},
     },
     "brain_blood_coarse": {
-        "batch_1": {"Micro_to_Mono": "Factor 12", "Mono_to_Micro": "Factor 15"},
-        "batch_2": {"Micro_to_Mono": "Factor 6", "Mono_to_Micro": "Factor 17"},
+        "cohort_1": {"Micro_to_Mono": "Factor 12", "Mono_to_Micro": "Factor 15"},
+        "cohort_2": {"Micro_to_Mono": "Factor 6", "Mono_to_Micro": "Factor 17"},
     },
     "brain_coarse": {
-        "batch_1": {"Micro_to_Mono": "Factor 4", "Mono_to_Micro": "Factor 3"}
+        "cohort_1": {"Micro_to_Mono": "Factor 4", "Mono_to_Micro": "Factor 3"}
     },
 }
 
 
-def create_enrichment_directory(loadings_path: str) -> str:
+def create_enrichment_directory(loadings_path) -> Path:
     """Create directory for enrichment results."""
-    enrich_path = os.path.join(loadings_path, "enrichr_results")
-    os.makedirs(enrich_path, exist_ok=True)
+    enrich_path = Path(loadings_path) / "enrichr_results"
+    enrich_path.mkdir(parents=True, exist_ok=True)
     return enrich_path
 
 
 def enrich_mono_micro_brain(
-    batch, loadings_path, adata_br, genedbs, design, out_folder
+    cohort, loadings_path, adata_br, genedbs, design, out_folder
 ):
 
     background_micro = get_expressed_genes(
@@ -73,7 +64,7 @@ def enrich_mono_micro_brain(
     thresh = find_threshold_loadings(factors, quantile=0.70)
 
     ## Monocytes --> Microglia
-    mo2mi_factor = CELLS_FACTOR_DICT[design][batch]["Mono_to_Micro"]
+    mo2mi_factor = CELLS_FACTOR_DICT[design][cohort]["Mono_to_Micro"]
     lr_loads_mono_to_micro = process_loadings(lr_loadings, mo2mi_factor, thresh)
     receiver_cells_mo2mi = factors["Receiver Cells"][mo2mi_factor] > thresh
 
@@ -136,7 +127,7 @@ def enrich_mono_micro_brain(
     )
 
     ## Microglia --> Monocytes
-    mi2mo_factor = CELLS_FACTOR_DICT[design][batch]["Micro_to_Mono"]
+    mi2mo_factor = CELLS_FACTOR_DICT[design][cohort]["Micro_to_Mono"]
     lr_loads_micro_to_mono = process_loadings(lr_loadings, mi2mo_factor, thresh)
     sender_cells_mi2mo = factors["Sender Cells"][mi2mo_factor] > thresh
 
@@ -153,8 +144,8 @@ def enrich_mono_micro_brain(
     mono_receptors_ = []
     for k in ["CD16", "CD14"]:
         ddf = ranked_genes_df(adata_br, receptors_mono, key=k)
-        ligands = filter_and_process_de(ddf, target_cells_mono)
-        mono_receptors_.append(ligands)
+        receptors = filter_and_process_de(ddf, target_cells_mono)
+        mono_receptors_.append(receptors)
 
     mono_receptors = list(set(mono_receptors_[0]) | set(mono_receptors_[1]))
 
@@ -173,25 +164,21 @@ def enrich_mono_micro_brain(
     )
 
     enr_df_ligands_micro_to_mono = enr_df(
-        gset_ligands_micro_to_mono, GSEA_DBS, background_micro, out_folder
+        gset_ligands_micro_to_mono, genedbs, background_micro, out_folder
     )
     enr_df_receptors_micro_to_mono = enr_df(
-        gset_receptors_micro_to_mono, GSEA_DBS, background_mono, out_folder
+        gset_receptors_micro_to_mono, genedbs, background_mono, out_folder
     )
     common_paths_micro_to_mono = process_common_paths(
         enr_df_ligands_micro_to_mono, enr_df_receptors_micro_to_mono
     )
     common_paths_micro_to_mono.to_csv(out_folder / "Enriched_paths_micro_to_mono.csv")
 
-    plot_pathway_network(
-        common_paths_micro_to_mono,
-        "Microglia -> Monocytes",
-        out_folder / "Net_paths_micro_to_mono.png",
-    )
+
 
 
 def enrich_mono_micro_blood_micro(
-    batch, loadings_path, adata_br, adata_bl, adata_tf, design, out_folder
+    cohort, loadings_path, adata_br, adata_bl, adata_tf, design, out_folder, genedbs=GSEA_DBS
 ):
 
     n_celltypes_brain = adata_br.obs["cell_type.v2"].nunique()
@@ -207,7 +194,7 @@ def enrich_mono_micro_blood_micro(
     lr_loadings = factors["Ligand-Receptor Pairs"]
 
     # Monocytes to Microglia
-    mo2mi_factor = CELLS_FACTOR_DICT[design][batch]["Mono_to_Micro"]
+    mo2mi_factor = CELLS_FACTOR_DICT[design][cohort]["Mono_to_Micro"]
     lr_loads_mono_to_micro = process_loadings(
         lr_loadings, mo2mi_factor, thresh
     ).reset_index()
@@ -259,13 +246,13 @@ def enrich_mono_micro_blood_micro(
 
     enr_df_ligands_mono_to_micro = enr_df(
         gset_ligands_mono_to_micro,
-        GSEA_DBS,
+        genedbs,
         background_mono,
         out_folder,
     )
     enr_df_receptors_mono_to_micro = enr_df(
         gset_receptors_mono_to_micro,
-        GSEA_DBS,
+        genedbs,
         background_micro,
         out_folder,
     )
@@ -274,15 +261,11 @@ def enrich_mono_micro_blood_micro(
     )
     common_paths_mono_to_micro.to_csv(out_folder / "Enriched_paths_mono_to_micro.csv")
 
-    plot_pathway_network(
-        common_paths_mono_to_micro,
-        "Monocytes -> Microglia",
-        out_folder / "Net_paths_mono_to_micro.png",
-    )
+
 
     # Microglia to Monocytes
 
-    mi2mo_factor = CELLS_FACTOR_DICT[design][batch]["Micro_to_Mono"]
+    mi2mo_factor = CELLS_FACTOR_DICT[design][cohort]["Micro_to_Mono"]
     lr_loads_micro_to_mono = process_loadings(
         lr_loadings, mi2mo_factor, thresh
     ).reset_index()
@@ -293,15 +276,11 @@ def enrich_mono_micro_blood_micro(
     )
     all_receptors = get_unique_receptors(lr_loads_micro_to_mono, micro_ligands)
 
-    target_cells_mono_bl = [
-        c for c in adata_bl.obs["cell_type.v2"].unique() if "mono" not in c
-    ]
-
     mono_receptors_bl_ = []
     for k in ["CD16", "CD14"]:
         ddf = ranked_genes_df(adata_bl, all_receptors, key=k)
-        ligands = filter_and_process_de(ddf, target_cells_mono_bl)
-        mono_receptors_bl_.append(ligands)
+        receptors = filter_and_process_de(ddf, target_cells_mono_bl)
+        mono_receptors_bl_.append(receptors)
 
     mono_receptors_bl = set(mono_receptors_bl_[0]) | set(mono_receptors_bl_[1])
 
@@ -311,8 +290,8 @@ def enrich_mono_micro_blood_micro(
     mono_receptors_tf_ = []
     for k in ["CD16", "CD14"]:
         ddf = ranked_genes_df(adata_tf, all_receptors, key=k)
-        ligands = filter_and_process_de(ddf, target_cells_mono_tf)
-        mono_receptors_tf_.append(ligands)
+        receptors = filter_and_process_de(ddf, target_cells_mono_tf)
+        mono_receptors_tf_.append(receptors)
 
     mono_receptors_tf = set(mono_receptors_tf_[0]) | set(mono_receptors_tf_[1])
 
@@ -333,13 +312,13 @@ def enrich_mono_micro_blood_micro(
 
     enr_df_ligands_micro_to_mono = enr_df(
         gset_ligands_micro_to_mono,
-        GSEA_DBS,
+        genedbs,
         background_micro,
         out_folder,
     )
     enr_df_receptors_micro_to_mono = enr_df(
         gset_receptors_micro_to_mono,
-        GSEA_DBS,
+        genedbs,
         background_mono,
         out_folder,
     )
@@ -348,15 +327,11 @@ def enrich_mono_micro_blood_micro(
     )
     common_paths_micro_to_mono.to_csv(out_folder / "Enriched_paths_micro_to_mono.csv")
 
-    plot_pathway_network(
-        common_paths_micro_to_mono,
-        "Microglia -> Monocytes",
-        out_folder / "Net_paths_micro_to_mono.png",
-    )
+
 
 
 def enrich_mono_micro_blood_brain(
-    batch, loadings_path, adata_br, adata_bl, adata_tf, design, out_folder
+    cohort, loadings_path, adata_br, adata_bl, adata_tf, design, out_folder, genedbs=GSEA_DBS
 ):
 
     n_celltypes_brain = adata_br.obs["cell_type.v2"].nunique()
@@ -372,7 +347,7 @@ def enrich_mono_micro_blood_brain(
     lr_loadings = factors["Ligand-Receptor Pairs"]
 
     # Monocytes to Microglia
-    mo2mi_factor = CELLS_FACTOR_DICT[design][batch]["Mono_to_Micro"]
+    mo2mi_factor = CELLS_FACTOR_DICT[design][cohort]["Mono_to_Micro"]
     lr_loads_mono_to_micro = process_loadings(
         lr_loadings, mo2mi_factor, thresh
     ).reset_index()
@@ -428,13 +403,13 @@ def enrich_mono_micro_blood_brain(
 
     enr_df_ligands_mono_to_micro = enr_df(
         gset_ligands_mono_to_micro,
-        GSEA_DBS,
+        genedbs,
         background_mono,
         out_folder,
     )
     enr_df_receptors_mono_to_micro = enr_df(
         gset_receptors_mono_to_micro,
-        GSEA_DBS,
+        genedbs,
         background_micro,
         out_folder,
     )
@@ -443,15 +418,10 @@ def enrich_mono_micro_blood_brain(
     )
     common_paths_mono_to_micro.to_csv(out_folder / "Enriched_paths_mono_to_micro.csv")
 
-    plot_pathway_network(
-        common_paths_mono_to_micro,
-        "Monocytes -> Microglia",
-        out_folder / "Net_paths_mono_to_micro.png",
-    )
 
     # Microglia to Monocytes
 
-    mi2mo_factor = CELLS_FACTOR_DICT[design][batch]["Micro_to_Mono"]
+    mi2mo_factor = CELLS_FACTOR_DICT[design][cohort]["Micro_to_Mono"]
     lr_loads_micro_to_mono = process_loadings(
         lr_loadings, mi2mo_factor, thresh
     ).reset_index()
@@ -472,8 +442,8 @@ def enrich_mono_micro_blood_brain(
     mono_receptors_bl_ = []
     for k in ["CD16", "CD14"]:
         ddf = ranked_genes_df(adata_bl, all_receptors, key=k)
-        ligands = filter_and_process_de(ddf, target_cells_mono_bl)
-        mono_receptors_bl_.append(ligands)
+        receptors = filter_and_process_de(ddf, target_cells_mono_bl)
+        mono_receptors_bl_.append(receptors)
 
     mono_receptors_bl = set(mono_receptors_bl_[0]) | set(mono_receptors_bl_[1])
 
@@ -490,10 +460,10 @@ def enrich_mono_micro_blood_brain(
         mono_receptors = []
         for k in ["CD16", "CD14"]:
             ddf = ranked_genes_df(adata_tf, mono_receptors_bl, key=k)
-            ligands = filter_and_process_de(ddf, target_cells_tf)
-            mono_receptors.append(ligands)
+            receptors = filter_and_process_de(ddf, target_cells_tf)
+            mono_receptors.append(receptors)
     else:
-        mono_receptors = mono_receptors_bl_
+        mono_receptors = mono_receptors_bl
 
     lr_loads_micro_to_mono_filtered = filter_lr(
         lr_loads_micro_to_mono, micro_ligands, mono_receptors
@@ -510,13 +480,13 @@ def enrich_mono_micro_blood_brain(
 
     enr_df_ligands_micro_to_mono = enr_df(
         gset_ligands_micro_to_mono,
-        GSEA_DBS,
+        genedbs,
         background_micro,
         out_folder,
     )
     enr_df_receptors_micro_to_mono = enr_df(
         gset_receptors_micro_to_mono,
-        GSEA_DBS,
+        genedbs,
         background_mono,
         out_folder,
     )
@@ -525,8 +495,3 @@ def enrich_mono_micro_blood_brain(
     )
     common_paths_micro_to_mono.to_csv(out_folder / "Enriched_paths_micro_to_mono.csv")
 
-    plot_pathway_network(
-        common_paths_micro_to_mono,
-        "Microglia -> Monocytes",
-        out_folder / "Net_paths_micro_to_mono.png",
-    )

@@ -4,9 +4,11 @@ from pathlib import Path
 import decoupler as dc
 import numpy as np
 import scanpy as sc
+from bokeh.palettes import Inferno256
+from bokeh.plotting import show
 
 from adata_processing_utils import filter_adata, load_brain_blood_data
-from utils import interactive_embedding
+from plot_utils import interactive_embedding
 
 msigdb = dc.get_resource("MSigDB")
 
@@ -16,12 +18,12 @@ msigdb_wiki = msigdb_wiki[~msigdb_wiki.duplicated(["geneset", "genesymbol"])]
 msigdb_reac = msigdb_reac[~msigdb_reac.duplicated(["geneset", "genesymbol"])]
 
 
-def main(project_path, batch, threshold_targets):
+def main(project_path, cohort, threshold_targets):
 
     project_path = Path(project_path)
 
     blood_adata, brain_adata, blood_adata_hvg, brain_adata_hvg = load_brain_blood_data(
-        batch, project_path
+        cohort, project_path
     )
 
     brain_adata_filt = filter_adata(brain_adata, brain_adata_hvg)
@@ -29,8 +31,6 @@ def main(project_path, batch, threshold_targets):
 
     brain_adata_hvg_filt = filter_adata(brain_adata_hvg, brain_adata_hvg)
     blood_adata_hvg_filt = filter_adata(blood_adata_hvg, blood_adata_hvg)
-
-    
 
     for i, msigdbs in zip(["wikipathways", "reactome"], [msigdb_wiki, msigdb_reac]):
         dc.run_ora(
@@ -63,7 +63,7 @@ def main(project_path, batch, threshold_targets):
     for msigdbs in ["wikipathways", "reactome"]:
 
         acts_br = dc.get_acts(
-            brain_adata_hvg_b1_filt, obsm_key=f"ora_estimate_{msigdbs}"
+            brain_adata_hvg_filt, obsm_key=f"ora_estimate_{msigdbs}"
         ).copy()
         acts_br_v = acts_br.X.ravel()
         max_br_e = np.nanmax(acts_br_v[np.isfinite(acts_br_v)])
@@ -71,14 +71,14 @@ def main(project_path, batch, threshold_targets):
         acts_brs.append(acts_br.copy())
 
         acts_bl = dc.get_acts(
-            blood_adata_hvg_b1_filt, obsm_key=f"ora_estimate_{msigdbs}"
+            blood_adata_hvg_filt, obsm_key=f"ora_estimate_{msigdbs}"
         ).copy()
         acts_bl_v = acts_bl.X.ravel()
         max_bl_e = np.nanmax(acts_bl_v[np.isfinite(acts_bl_v)])
         acts_bl.X[~np.isfinite(acts_bl.X)] = max_bl_e
         acts_bls.append(acts_bl.copy())
 
-    out_path = project_path / batch
+    out_path = project_path / cohort
 
     wiki_paths = [
             "WP_CELLS_AND_MOLECULES_INVOLVED_IN_LOCAL_ACUTE_INFLAMMATORY_RESPONSE",
@@ -121,16 +121,16 @@ if __name__ == "__main__":
         default="/sc/arion/projects/psychgen/lbp/data/ScProcesses_brainBlood_nicole/",
     )
     parser.add_argument(
-        "-b", "--batch", help="Batch identifier", choices=["batch_1", "batch_2"]
+        "-b", "--cohort", help="cohort identifier", choices=["cohort_1", "cohort_2"]
     )
 
     parser.add_argument(
-        "-t", "--threshold_targets", help="decoupler ORA threshold", default=0.05
+        "-t", "--threshold_targets", help="decoupler ORA threshold", type=float, default=0.05
     )
 
     args = parser.parse_args()
     main(
         args.project_path,
-        args.batch,
+        args.cohort,
         args.threshold_targets,
     )

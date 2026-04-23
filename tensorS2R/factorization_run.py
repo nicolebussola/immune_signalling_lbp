@@ -1,7 +1,7 @@
-import argparse
 import os
 import warnings
 from pathlib import Path
+
 
 import cell2cell as c2c
 import liana as li
@@ -24,7 +24,7 @@ np.random.seed(42)
 
 def run_tensorcell2cell(
     project_path,
-    batch,
+    cohort,
     sample_key,
     groupby,
     factorization_type,
@@ -33,18 +33,17 @@ def run_tensorcell2cell(
     device,
 ):
     project_path = Path(project_path)
-    output_path = project_path / batch / "c2c_liana_outputs" / factorization_type
+    output_path = project_path / cohort / "c2c_liana_outputs" / factorization_type
     os.makedirs(output_path, exist_ok=True)
 
     if device == "cuda":
         tl.set_backend("pytorch")
     if factorization_type == "micro_blood_coarse":
-        adata = create_blood_brain_tf(batch, project_path, write=False, micro_only=True)
-    if factorization_type == "brain_blood_coarse":
+        adata = create_blood_brain_tf(cohort, project_path, write=False, micro_only=True)
+    elif factorization_type == "brain_blood_coarse":
         adata = create_blood_brain_tf(
-            batch, project_path, write=False, micro_only=False
+            cohort, project_path, write=False, micro_only=False
         )
-
         adata.obs["cell_type.v3"] = (
             adata.obs["cell_type_coarse"].astype(str)
             + "_"
@@ -53,10 +52,11 @@ def run_tensorcell2cell(
         adata.obs["cell_type.v4"] = (
             adata.obs["cell_type"].astype(str) + "_" + adata.obs["tissue"].astype(str)
         )
-
     elif factorization_type == "brain_coarse":
-        _, brain_adata, _, brain_adata_hvg = load_brain_blood_data(batch, project_path)
+        _, brain_adata, _, brain_adata_hvg = load_brain_blood_data(cohort, project_path)
         adata = filter_and_process_anno_adata(brain_adata, brain_adata_hvg)
+    else:
+        raise ValueError(f"Unknown factorization_type: '{factorization_type}'. Choose from: micro_blood_coarse, brain_blood_coarse, brain_coarse")
 
     adata.X = adata.layers["log1p_norm"].copy()
     adata.obs[sample_key] = adata.obs["pt"]
@@ -166,24 +166,21 @@ def run_tensorcell2cell(
         meta_cmaps=["plasma", "Dark2_r", "tab20", "tab20"],
         fontsize=10,
         plot_legend=True,
-        filename=output_folder / f"Factorization_{batch}.pdf",
+        filename=output_folder / f"Factorization_{cohort}.pdf",
     )
 
     factors = c2c.io.load_tensor_factors(output_folder / "Loadings.xlsx")
 
-    context_dict = adata.obs.set_index("sample")["chemistry"].sort_values().to_dict()
-
     version_colors = c2c.plotting.aesthetics.get_colors_from_labels(
         ["v3", "v2"], cmap="plasma"
     )
-    version_colors
     color_dict = {k: version_colors[v] for k, v in context_dict.items()}
     col_colors = pd.Series(color_dict)
     col_colors = col_colors.to_frame()
     col_colors.columns = ["Chemistry"]
 
     df_context = factors["Contexts"].copy()
-    df_context["chemistry"] = context_dict.values()
+    df_context["chemistry"] = list(context_dict.values())
     df_context.index = df_context.index.astype(str)
 
     sample_cm = c2c.plotting.loading_clustermap(
@@ -194,7 +191,7 @@ def run_tensorcell2cell(
         dendrogram_ratio=0.3,
         cbar_fontsize=12,
         tick_fontsize=14,
-        filename=output_folder / f"clustermap_{batch}.pdf",
+        filename=output_folder / f"clustermap_{cohort}.pdf",
     )
 
     plt.sca(sample_cm.ax_heatmap)
@@ -210,7 +207,7 @@ def run_tensorcell2cell(
         loading_threshold=0.1,
         use_zscore=False,
         figsize=(35, 8),
-        filename=output_folder / f"Clustermap-LRs_{batch}.pdf",
+        filename=output_folder / f"Clustermap-LRs_{cohort}.pdf",
         row_cluster=False,
     )
 
@@ -269,5 +266,4 @@ def run_tensorcell2cell(
         factors, sender_label="Sender Cells", receiver_label="Receiver Cells"
     ).sort_values("Gini").to_csv(output_folder / "Gini.csv")
     return output_folder, adata
-
 
