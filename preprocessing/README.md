@@ -11,7 +11,8 @@ This folder contains the preprocessing code used to generate the processed `.h5a
 - `run_ddqc/`: compute ddqc metrics for each sample from CellBender-filtered 10x `.h5` inputs.
 - `run_preprocessing/`: sample-level preprocessing, QC metric calculation, doublet detection, feature selection, and QC plotting.
 - `run_merge/`: merge per-sample processed `.h5ad` files, filter cells, normalize counts, and select HVGs.
-- `run_annotation/`: annotate merged data using CellTypist and scArches-based reference mapping (blood) and UniCell Deconvolve (brain).
+- `run_annotation/run_annotate.py`: annotate blood merged data using CellTypist and scArches-based reference mapping.
+- `run_annotation/unicell_annotation.py`: annotate brain merged data using UniCell Deconvolve (v0.1.0).
 - `utils.py`, `labels.py`: shared utilities and annotation helpers.
 
 ### Intended flow
@@ -19,7 +20,9 @@ This folder contains the preprocessing code used to generate the processed `.h5a
 1. Run `run_ddqc` on raw sample-level CellBender-filtered inputs.
 2. Run `run_preprocessing` on the same sample directories together with the ddqc outputs.
 3. Run `run_merge` on the resulting per-sample `.h5ad` files.
-4. Run annotation on the merged data.
+4. Annotate merged data:
+   - **Blood**: `run_annotation/run_annotate.py` (CellTypist + scArches)
+   - **Brain**: `run_annotation/unicell_annotation.py` (UniCell Deconvolve)
 
 ### CLI entrypoints
 
@@ -132,3 +135,40 @@ python preprocessing/process_mouse_data.py
 Edit the `project_path` variable at the top of the script to point to your local data directory before running. Raw GEO files should be placed in `<project_path>/data/GSE225948_RAW/`. Output is written to `<project_path>/data/mouse_processed/`.
 
 **Note:** Mouse–human ortholog mapping for cross-species DE comparison is performed separately in R using `biomaRt::getLDS` and is a prerequisite for running `PBICs_analysis/DEA_dreamlet.R` and `PBICs_analysis/signature_comparison.r` on mouse data.
+
+---
+
+## Annotation scripts
+
+### `run_annotation/run_annotate.py` — Blood annotation (CellTypist + scArches)
+
+Annotates blood merged data using CellTypist (Immune_All_Low and Immune_All_High models) and scArches reference mapping against a pre-trained PBMC model from Figshare.
+
+**Input:** merged blood `.h5ad` with `counts` layer (output of `run_merge`).
+
+**Output:** `adata.obs` updated with `celltypist_cell_label_coarse`, `celltypist_cell_label_fine`, and scVI latent embedding in `adata.obsm["X_scVI"]`.
+
+---
+
+### `run_annotation/unicell_annotation.py` — Brain annotation (UniCell Deconvolve)
+
+Annotates brain merged data using UniCell Deconvolve (v0.1.0) via its cloud API.
+
+**Requires:** a UniCell API token — set the `UNICELL_TOKEN` environment variable or edit the script directly.
+
+**Input:** HVG-processed brain `.h5ad` (output of `run_merge` + batch correction), which must contain:
+- `layers["counts"]` — raw counts
+- `obsp["connectivities"]` — neighbor graph (used for Leiden clustering)
+
+| Cohort | Input file |
+|---|---|
+| Cohort 1 | `cohort_1_brain_filtered_4000HighlyDeviant_20_harmony_regressedScaled.h5ad` |
+| Cohort 2 | `cohort_2_brain_filtered_4000HighlyDeviant_20_harmony_scaled.h5ad` |
+
+**Output:** `{COHORT}_brain_unicell_annotations.csv` — full `adata.obs` containing UniCell cell-type predictions and Leiden cluster labels.
+
+**Usage:** set `COHORT` at the top of the script, then run:
+
+```bash
+UNICELL_TOKEN=<your_token> python preprocessing/run_annotation/unicell_annotation.py
+```

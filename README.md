@@ -49,7 +49,7 @@ immune_signalling_lbp/
 
 Processes raw 10x CellBender-filtered outputs into merged, annotated `.h5ad` objects (human cohorts), and preprocesses the public mouse scRNA-seq dataset (GEO GSE225948) for cross-species comparison.
 
-**Human (Cohorts 1 & 2):** ambient RNA removal (CellBender) → per-sample QC + doublet detection → merge → normalization (log1p + scran) → HVG selection → batch correction (Harmony / scANVI) → cell type annotation.
+**Human (Cohorts 1 & 2):** ambient RNA removal (CellBender) → per-sample QC + doublet detection → merge → normalization (log1p + scran) → HVG selection → batch correction (Harmony / scANVI) → cell type annotation (blood: CellTypist + scArches; brain: UniCell Deconvolve).
 
 **Mouse:** `process_mouse_data.py` — loads GEO GSE225948 (22 paired brain + blood samples, 11 mice), assigns consistent sample keys by (treatment, Replicate) pairing, log-normalizes, filters cell types with <100 cells, and computes UMAP following the original publication's pipeline.
 
