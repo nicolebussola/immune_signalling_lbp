@@ -3,7 +3,7 @@
 Reproducibility code for:
 
 > **Immune signaling links blood to brain in living humans**
-> Nicole Bussola, Lora E. Liharska, John F. Fullard, Ryan C. Thompson, Eric Vornholt, Girish N. Nadkarni, Eric E. Schadt, Noam D. Beckmann, Ombretta Melaiu, Panos Roussos, Brian H. Kopell†, Alexander W. Charney†
+> Nicole Bussola, Lora E. Liharska, John F. Fullard, Ryan C. Thompson, Eric Vornholt, Girish N. Nadkarni, Eric E. Schadt, Noam D. Beckmann, Vibhuti Patel, Ombretta Melaiu, Panos Roussos, Brian H. Kopell†, Alexander W. Charney†
 
 ---
 
