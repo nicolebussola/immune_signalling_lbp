@@ -32,7 +32,7 @@ The paper makes four main contributions:
 ## Repository structure
 
 ```
-blood-brain-LBP/
+immune_signalling_lbp/
 ├── preprocessing/          # Raw data processing: QC, filtering, normalization, annotation
 ├── PBICs_analysis/         # DE analysis, TF/pathway activity, compositional analysis, cross-dataset comparison
 ├── tensorS2R/              # Tensor-S2R CCC pipeline (LIANA + Tensor-cell2cell + enrichment)
