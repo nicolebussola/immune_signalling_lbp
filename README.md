@@ -47,9 +47,11 @@ blood-brain-LBP/
 
 ### 1. Preprocessing (`preprocessing/`)
 
-Processes raw 10x CellBender-filtered outputs into merged, annotated `.h5ad` objects.
+Processes raw 10x CellBender-filtered outputs into merged, annotated `.h5ad` objects (human cohorts), and preprocesses the public mouse scRNA-seq dataset (GEO GSE225948) for cross-species comparison.
 
-Steps: ambient RNA removal (CellBender) → per-sample QC + doublet detection → merge → normalization (log1p + scran) → HVG selection → batch correction (Harmony / scANVI) → cell type annotation.
+**Human (Cohorts 1 & 2):** ambient RNA removal (CellBender) → per-sample QC + doublet detection → merge → normalization (log1p + scran) → HVG selection → batch correction (Harmony / scANVI) → cell type annotation.
+
+**Mouse:** `process_mouse_data.py` — loads GEO GSE225948 (22 paired brain + blood samples, 11 mice), assigns consistent sample keys by (treatment, Replicate) pairing, log-normalizes, filters cell types with <100 cells, and computes UMAP following the original publication's pipeline.
 
 See [`preprocessing/README.md`](preprocessing/README.md) for full details.
 
@@ -80,7 +82,7 @@ The pipeline implements four steps:
 3. **Over-representation analysis (ORA)** — decoupleR ORA on common enriched pathways at cell and pseudo-bulk level.
 4. **Pseudo-bulk LR product** — mean pseudo-bulk expression of ligand in sender × receptor in receiver cells.
 
-Three analytical designs are available:
+**Human pipeline** — three analytical designs:
 
 | Mode | Data | Key interaction |
 |------|------|----------------|
@@ -95,6 +97,19 @@ python -m tensorS2R \
     -f <micro_blood_coarse|brain_coarse|brain_blood_coarse> \
     [-s <sample_key>] \
     [-g <groupby>] \
+    [-m <inner|outer>] \
+    [-r <rank>] \
+    [-d <cuda|cpu>]
+```
+
+**Mouse pipeline** (`factorization_run_mouse.py`) — LIANA mouse consensus + Tensor-cell2cell on the GEO GSE225948 paired brain/blood dataset (sham, D02, D14 conditions; rank fixed at 20):
+
+```bash
+python -m tensorS2R.factorization_run_mouse \
+    -p <mouse_processed_path> \
+    [-s <sample_key>] \
+    [-g <groupby>] \
+    [-f <factorization_type>] \
     [-m <inner|outer>] \
     [-r <rank>] \
     [-d <cuda|cpu>]

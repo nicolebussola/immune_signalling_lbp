@@ -1,8 +1,10 @@
 # tensorS2R Communication Pipeline
 
-End-to-end pipeline for ligand-receptor communication analysis between Monocytes (blood) and Microglia (brain) using Tensor-cell2cell and LIANA.
+End-to-end pipeline for ligand-receptor communication analysis using Tensor-cell2cell and LIANA. Supports three human factorization modes (Cohorts 1 & 2) and a dedicated mouse pipeline (GEO GSE225948).
 
-## Running the pipeline
+---
+
+## Human pipeline
 
 ```bash
 python -m tensorS2R \
@@ -24,12 +26,12 @@ python -m tensorS2R \
 | `sample_key` | `-s` | `sample` | Patient column in `adata.obs` |
 | `groupby` | `-g` | `cell_type_coarse` | Cell-type column for LIANA predictions |
 | `merging_mode` | `-m` | `inner` | Sample merging mode for tensor construction |
-| `factorization_rank` | `-r` | auto (elbow) | Tensor rank; inferred automatically if omitted |
+| `factorization_rank` | `-r` | auto (elbow) | Tensor rank; fixed at 20 when >7 cell types |
 | `device` | `-d` | `cuda` | `cuda` or `cpu` |
 
 ---
 
-## Factorization modes
+## Human factorization modes
 
 ### `brain_coarse` — Monocytes and Microglia in brain only
 
@@ -72,20 +74,60 @@ Uses the full combined blood+brain AnnData (`micro_only=False`).
 
 ---
 
+## Mouse pipeline
+
+Runs LIANA mouse consensus + Tensor-cell2cell on the paired brain/blood mouse dataset (GEO GSE225948; 11 mice; sham, D02, D14 conditions). Requires the output of `preprocessing/process_mouse_data.py` (`paired_blood_brain_mouse.h5ad`).
+
+```bash
+python -m tensorS2R.factorization_run_mouse \
+    -p <mouse_processed_path> \
+    [-s <sample_key>] \
+    [-g <groupby>] \
+    [-f <factorization_type>] \
+    [-m <merging_mode>] \
+    [-r <rank>] \
+    [-d <cpu|cuda>]
+```
+
+| Argument | Flag | Default | Description |
+|---|---|---|---|
+| `project_path` | `-p` | — | Path to `mouse_processed/` directory |
+| `sample_key` | `-s` | `sample` | Sample column in `adata.obs` |
+| `groupby` | `-g` | `parent` | Cell-type column for LIANA predictions (`parent` = coarse, `sub.celltype` = fine) |
+| `factorization_type` | `-f` | `mouse_coarse` | Label used as output subfolder name |
+| `merging_mode` | `-m` | `inner` | Tensor construction merging mode |
+| `factorization_rank` | `-r` | auto | Fixed at 20 when >7 cell types (paper default) |
+| `device` | `-d` | `cuda` | `cuda` or `cpu` |
+
+Cell-type columns available in `adata.obs` after loading:
+
+| Column | Description |
+|---|---|
+| `parent` | Coarse cell type (e.g. `Mo+`, `Mo-`, `MdC`) |
+| `sub.celltype` | Fine-grained cell type (e.g. `Mo1`, `Mo2`, `MdC2`) |
+| `cell_type.v2` | `parent_tissue` (e.g. `Mo+_blood`, `MdC_brain`) |
+| `cell_type.v3` | `sub.celltype_tissue` |
+
+---
+
 ## Module structure
 
 | File | Purpose |
 |---|---|
-| `__main__.py` | Pipeline entry point — runs factorization then enrichment |
-| `factorization_run.py` | `run_tensorcell2cell()` — LIANA + Tensor-cell2cell |
-| `enrichment_run.py` | Enrichment functions for each factorization mode |
+| `__main__.py` | Human pipeline entry point — runs factorization then enrichment |
+| `factorization_run.py` | `run_tensorcell2cell()` — LIANA + Tensor-cell2cell (human) |
+| `factorization_run_mouse.py` | `run_tensorcell2cell_mouse()` — LIANA mouse consensus + Tensor-cell2cell |
+| `enrichment_run.py` | Enrichment functions for each human factorization mode |
 | `adata_processing_utils.py` | Data loading, filtering, and preprocessing |
 | `lr_loadings_utils.py` | LR pair processing, DE filtering, enrichment utilities |
 | `ora_analysis.py` | Over-representation analysis (ORA) with decoupler |
 | `plot_utils.py` | Interactive Bokeh embedding plots |
 
+---
+
 ## Output structure
 
+**Human:**
 ```
 <project_path>/<cohort>/c2c_liana_outputs/<factorization_type>/rank_<r>/<merging_mode>/<groupby>/
     Loadings.xlsx
@@ -99,3 +141,16 @@ Uses the full combined blood+brain AnnData (`micro_only=False`).
     enrichr_results/
         Enriched_paths_mono_to_micro.csv
         Enriched_paths_micro_to_mono.csv
+```
+
+**Mouse:**
+```
+<mouse_processed_path>/c2c_liana_outputs/<factorization_type>/rank_<r>/<merging_mode>/<groupby>/
+    Loadings.xlsx
+    Factorization_mouse.pdf
+    clustermap_mouse.pdf
+    Clustermap-LRs_mouse.pdf
+    Gini_mouse.csv
+    Networks_mouse.pdf
+    liana_agg_mouse.pdf
+```
