@@ -51,6 +51,11 @@ Expected directory layout:
     ...
 ```
 
+**NB**
+CellBender-filtered inputs are obtain via
+`cellbender remove-background  --input /PT-XXX-L/raw_feature_bc_matrix.h5 --output PT-XXX-L-CellBender.h5  --cuda`
+
+
 Outputs:
 
 - `<sample_dir>/<PT>-<side>_CellBender_filtered_ddqc.csv`
