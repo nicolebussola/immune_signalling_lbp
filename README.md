@@ -15,7 +15,7 @@ The paper makes four main contributions:
 1. A scalable paired blood-brain sampling strategy in a neurosurgical setting.
 2. A publicly available transcriptomic resource from living humans (available on Synapse).
 3. Characterization of peripheral blood immune cell (PBIC) transcriptional states in the brain.
-4. A multi-step neuroimmune communication architecture linking monocytes, microglia, and neurons.
+4. A multi-step neuroimmune communication pipeline.
 
 ---
 
@@ -64,8 +64,8 @@ Analyzes the six peripheral blood immune cell types (CD4+ T, CD8+ T, CD14+ Monoc
 |--------|-------------|
 | `DEA_dreamlet.R` | Pseudo-bulk DE analysis between blood and brain per cell type (dreamlet, human + mouse) |
 | `compositional_analysis.R` | PBIC abundance differences between tissues (sccomp) |
-| `TF_and_pathway_activities.py` | TF activity (CollecTRI via decoupleR) and pathway activity (PROGENy) from DE signatures |
-| `signature_comparison.r` | Cross-dataset concordance: Cohort 2, mouse, bulk Cohort 3, external CSF data |
+| `TF_and_pathway_activities.py` | TF activity (CollecTRI) and pathway activity (PROGENy) from DE signatures |
+| `signature_comparison.r` | Cross-dataset concordance: Cohort 2, mouse, bulk Cohort 3, external data |
 
 See [`PBICs_analysis/README.md`](PBICs_analysis/README.md) for execution order and input/output details.
 
