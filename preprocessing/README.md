@@ -51,6 +51,11 @@ Expected directory layout:
     ...
 ```
 
+**NB**
+CellBender-filtered inputs are obtain via
+`cellbender remove-background  --input /PT-XXX-L/raw_feature_bc_matrix.h5 --output PT-XXX-L-CellBender.h5  --cuda`
+
+
 Outputs:
 
 - `<sample_dir>/<PT>-<side>_CellBender_filtered_ddqc.csv`
@@ -162,8 +167,8 @@ Annotates brain merged data using UniCell Deconvolve (v0.1.0) via its cloud API.
 
 | Cohort | Input file |
 |---|---|
-| Cohort 1 | `cohort_1_brain_filtered_4000HighlyDeviant_20_harmony_regressedScaled.h5ad` |
-| Cohort 2 | `cohort_2_brain_filtered_4000HighlyDeviant_20_harmony_scaled.h5ad` |
+| Cohort 1 | `cohort_1_brain_filtered_4000HighlyDeviant_20_harmony.h5ad` |
+| Cohort 2 | `cohort_2_brain_filtered_4000HighlyDeviant_20_harmony.h5ad` |
 
 **Output:** `{COHORT}_brain_unicell_annotations.csv` — full `adata.obs` containing UniCell cell-type predictions and Leiden cluster labels.
 

@@ -9,13 +9,13 @@ Reproducibility code for:
 
 ## Overview
 
-This repository contains all custom code used to reproduce the analyses described in the paper. Data from 276 blood-brain pairs from 169 Living Brain Project (LBP) participants were analyzed using single-cell and bulk transcriptomics to characterize how peripheral immune cells communicate with the living human brain.
+This repository contains all custom code used to reproduce the analyses described in the paper. Data from 259 blood-brain pairs from 169 Living Brain Project (LBP) participants were analyzed using single-cell and bulk transcriptomics to characterize how peripheral immune cells communicate with the living human brain.
 
 The paper makes four main contributions:
 1. A scalable paired blood-brain sampling strategy in a neurosurgical setting.
 2. A publicly available transcriptomic resource from living humans (available on Synapse).
 3. Characterization of peripheral blood immune cell (PBIC) transcriptional states in the brain.
-4. A multi-step neuroimmune communication architecture linking monocytes, microglia, and neurons.
+4. A multi-step neuroimmune communication pipeline.
 
 ---
 
@@ -25,7 +25,7 @@ The paper makes four main contributions:
 |--------|-------|--------------|--------|------------|
 | Cohort 1 | 13 | 9 | Immune-sorted PFC (scRNA-seq) + blood PBMCs | 10x 3′ v2/v3 |
 | Cohort 2 | 13 | 7 | Unsorted PFC nuclei (snRNA-seq) + blood PBMCs | 10x 3′ v3.1 |
-| Cohort 3 | 233 | 153 | Bulk RNA-seq (blood + brain) | — |
+| Cohort 3 | 233 | 153 | Bulk RNA-seq (blood + brain) | [Liharska et al.](https://www.nature.com/articles/s41380-025-03163-1) |
 
 ---
 
@@ -35,8 +35,7 @@ The paper makes four main contributions:
 immune_signalling_lbp/
 ├── preprocessing/          # Raw data processing: QC, filtering, normalization, annotation
 ├── PBICs_analysis/         # DE analysis, TF/pathway activity, compositional analysis, cross-dataset comparison
-├── tensorS2R/              # Tensor-S2R CCC pipeline (LIANA + Tensor-cell2cell + enrichment)
-├── notebooks/              # Exploratory notebooks
+├── tensorS2R/              # Tensor-S2R CCC pipeline (LIANA + Tensor-cell2cell + filtering + downstream analysos)
 ├── LBP_env.yml             # Conda environment
 └── pyproject.toml
 ```
@@ -59,14 +58,14 @@ See [`preprocessing/README.md`](preprocessing/README.md) for full details.
 
 ### 2. PBIC analysis (`PBICs_analysis/`)
 
-Analyzes the six peripheral blood immune cell types (CD4+ T, CD8+ T, CD14+ Mono, CD16+ Mono, NK, B cells) shared between blood and brain.
+Analyzes the six peripheral blood immune cell types (CD4+ T, CD8+ T, CD14+ Monocytes, CD16+ Monocytes, NK, B cells) shared between blood and brain (PBICs).
 
 | Script | Description |
 |--------|-------------|
 | `DEA_dreamlet.R` | Pseudo-bulk DE analysis between blood and brain per cell type (dreamlet, human + mouse) |
 | `compositional_analysis.R` | PBIC abundance differences between tissues (sccomp) |
-| `TF_and_pathway_activities.py` | TF activity (CollecTRI via decoupleR) and pathway activity (PROGENy) from DE signatures |
-| `signature_comparison.r` | Cross-dataset concordance: Cohort 2, mouse, bulk Cohort 3, external CSF data |
+| `TF_and_pathway_activities.py` | TF activity (CollecTRI) and pathway activity (PROGENy) from DE signatures |
+| `signature_comparison.r` | Cross-dataset concordance: Cohort 2, mouse, bulk Cohort 3, external data |
 
 See [`PBICs_analysis/README.md`](PBICs_analysis/README.md) for execution order and input/output details.
 
@@ -74,20 +73,21 @@ See [`PBICs_analysis/README.md`](PBICs_analysis/README.md) for execution order a
 
 ### 3. Tensor-S2R communication pipeline (`tensorS2R/`)
 
-End-to-end ligand-receptor communication pipeline combining LIANA+ and Tensor-cell2cell.
+End-to-end ligand-receptor communication pipeline.
 
-The pipeline implements four steps:
-1. **LR pair filtering** — top 70th percentile loadings; ligands/receptors filtered by scran-based DE (preferentially expressed on sender/receiver vs. other cell types).
-2. **Pathway enrichment** — Enrichr (GSEApy) on filtered LR sets against WikiPathways, Reactome, and GO Biological Process; common pathways extracted.
-3. **Over-representation analysis (ORA)** — decoupleR ORA on common enriched pathways at cell and pseudo-bulk level.
-4. **Pseudo-bulk LR product** — mean pseudo-bulk expression of ligand in sender × receptor in receiver cells.
+The pipeline implements five steps:
+1. **Tensor decomposition** combining LIANA+ and Tensor-cell2cell 
+2. **LR pair filtering** — top 70th percentile loadings; ligands/receptors filtered by scran-based DE (preferentially expressed on sender/receiver vs. other cell types).
+3. **Pathway enrichment** — Enrichr (GSEApy) on filtered LR sets against WikiPathways, Reactome, and GO Biological Process; common pathways extracted.
+4. **Over-representation analysis (ORA)** — decoupleR ORA on common enriched pathways at cell and pseudo-bulk level.
+5. **Pseudo-bulk LR product** — mean pseudo-bulk expression of ligand in sender × receptor in receiver cells.
 
 **Human pipeline** — three analytical designs:
 
 | Mode | Data | Key interaction |
 |------|------|----------------|
 | `micro_blood_coarse` | Blood PBMCs + microglia (brain) | Monocytes ↔ Microglia |
-| `brain_coarse` | Brain only (Cohort 2) | Monocytes ↔ Microglia (brain) |
+| `brain_coarse` | Brain only | Monocytes ↔ Microglia (brain) |
 | `brain_blood_coarse` | Full blood + all brain cell types | All PBICs ↔ all brain types |
 
 ```bash

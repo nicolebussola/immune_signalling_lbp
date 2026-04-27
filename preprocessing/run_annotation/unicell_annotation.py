@@ -8,8 +8,8 @@ import ucdeconvolve as ucd
 ucd.api.authenticate(os.environ.get("UNICELL_TOKEN", "UNICELL_TOKEN"))
 
 BRAIN_HVG_FILES = {
-    "cohort_1": "cohort_1_brain_filtered_4000HighlyDeviant_20_harmony_regressedScaled.h5ad",
-    "cohort_2": "cohort_2_brain_filtered_4000HighlyDeviant_20_harmony_scaled.h5ad",
+    "cohort_1": "cohort_1_brain_filtered_4000HighlyDeviant_20_harmony.h5ad",
+    "cohort_2": "cohort_2_brain_filtered_4000HighlyDeviant_20_harmony.h5ad",
 }
 
 COHORT = "cohort_1"  # set to "cohort_1" or "cohort_2"

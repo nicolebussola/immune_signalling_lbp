@@ -170,21 +170,12 @@ def run_merge(
     scran = adata_filtered.X / adata_filtered.obs["size_factors"].values[:, None]
     adata_filtered.layers["scran_normalization"] = csr_matrix(sc.pp.log1p(scran))
 
-    # log.info("Pearson residuals")
-    # adata_filtered.X = adata_filtered.layers["counts"].copy()
 
-    # analytic_pearson = sc.experimental.pp.normalize_pearson_residuals(
-    #     adata_filtered, inplace=False
-    # )
-    # adata_filtered.layers["analytic_pearson_residuals"] = csr_matrix(
-    #     analytic_pearson["X"]
-    # )
 
     log.info("Write filtered and normalized adata")
 
     adata_filtered.obs = adata_filtered.obs.apply(convert_to_categorical)
 
-    # adata_filtered.write(output_path / f"batch_{batch}_{tissue}_filteredscdbl_normalized.h5ad")
 
     log.critical("Feature selection")
 
