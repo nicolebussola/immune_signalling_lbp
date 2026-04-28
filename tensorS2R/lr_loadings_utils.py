@@ -446,23 +446,26 @@ def get_mean_expression(pdata, cell_type, celltype_col, sample_key=None):
     return df_c
 
 
-def compute_prod_dict(lr_pairs, pdata, df_micro, celltype_col, is_ligand=True, sample_key=None):
+def compute_prod_dict(lr_pairs, pdata, df_ref, celltype_col, is_ligand=True, sample_key=None, reference_cell="Microglia"):
     """
     Compute the product expression for ligand-receptor or receptor-ligand pairs.
 
     Parameters:
-    lr_pairs (list): List of ligand-receptor pairs.
-    pdata (AnnData): The annotated data matrix.
-    df_micro (pd.DataFrame): DataFrame containing microarray data.
-    celltype_col (str): The cell type column in adata.obs to group.
-    is_ligand (bool): Flag to indicate if the computation is for ligand (True) or receptor (False).
-    sample_key (str, optional): Participant column for pseudo-bulk aggregation (paper Step 4).
+    lr_pairs (list): List of ligand-receptor pairs (format: "ligand^receptor").
+    pdata (AnnData): The annotated data matrix for the non-reference cell types.
+    df_ref (pd.DataFrame): Mean expression DataFrame for the reference cell type.
+    celltype_col (str): The cell type column in pdata.obs to group.
+    is_ligand (bool): If True, the reference cell is the sender (df_ref provides the ligand);
+        if False, the reference cell is the receiver (df_ref provides the receptor).
+    sample_key (str, optional): Participant column for pseudo-bulk aggregation.
+    reference_cell (str): Cell type name to exclude from pdata iteration (it is the reference
+        side of the interaction, already captured in df_ref). Default: "Microglia".
 
     Returns:
-    dict: Dictionary with the product of ligand and receptor expressions for each cell type.
+    dict: {lr_pair: {cell_type: product_value}} for all non-reference cell types in pdata.
     """
     prod_dict = {}
-    cell_types = [cl for cl in pdata.obs[celltype_col].unique() if cl != "Microglia"]
+    cell_types = [cl for cl in pdata.obs[celltype_col].unique() if cl != reference_cell]
 
     for lr_pair in lr_pairs:
         ligand, receptor = lr_pair.split("^")
@@ -470,48 +473,32 @@ def compute_prod_dict(lr_pairs, pdata, df_micro, celltype_col, is_ligand=True, s
         for cell_type in cell_types:
             df_c = get_mean_expression(pdata, cell_type, celltype_col, sample_key=sample_key)
             if is_ligand:
-                prod_dict[lr_pair][cell_type] = df_micro[ligand][0] * df_c[receptor][0]
+                prod_dict[lr_pair][cell_type] = df_ref[ligand][0] * df_c[receptor][0]
             else:
-                prod_dict[lr_pair][cell_type] = df_micro[receptor][0] * df_c[ligand][0]
+                prod_dict[lr_pair][cell_type] = df_ref[receptor][0] * df_c[ligand][0]
     return prod_dict
 
 
-def plot_prod_dict(prod_dict, palette, title, out_file, figsize=(20, 6)):
+def plot_prod_dict(prod_dict, out_file, figsize=(12, 9), cmap="BuPu"):
     """
-    Plot the product expression.
+    Plot LR product expression as a heatmap (cell types × LR pairs).
 
     Parameters:
-    prod_dict (dict): Dictionary with the product of ligand and receptor expressions for each cell type.
-    palette (dict): Custom palette per cell types
-    title (str): The title of the plot.
-    out_file (str): The output file path for the plot.
-
-    Returns:
-    None
+    prod_dict (dict): {lr_pair: {cell_type: value}} from compute_prod_dict.
+    out_file (str or Path): Output file path.
+    figsize (tuple): Figure size. Default (12, 9).
+    cmap (str): Colormap. Default "BuPu".
     """
     df = pd.DataFrame(prod_dict)
-    df = df.reset_index().melt(
-        id_vars="index", var_name="Gene Pair", value_name="Expression"
-    )
-    df["Expression"] = df["Expression"] / 1e4
-    df.rename(columns={"index": "Cell Type"}, inplace=True)
-
-    plt.figure(figsize=figsize)
-    sns.scatterplot(
-        data=df,
-        x="Gene Pair",
-        y="Cell Type",
-        size="Expression",
-        hue="Cell Type",
-        palette=palette,
-        sizes=(20, 1000),
-        legend=False,
-    )
-
-    plt.title(title)
-    plt.xticks(rotation=45, ha="right")
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.heatmap(df, cmap=cmap, ax=ax)
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=30, ha="right", fontsize=14)
+    ax.set_yticklabels(ax.get_yticklabels(), rotation=90, fontsize=18)
+    cbar = ax.collections[0].colorbar
+    cbar.ax.tick_params(labelsize=14)
     plt.tight_layout()
     plt.savefig(out_file)
+    plt.close(fig)
 
 
 def enr_df(gset, gene_set, background, out_path, organism="human"):

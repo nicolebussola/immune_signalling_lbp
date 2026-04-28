@@ -120,11 +120,6 @@ def enrich_mono_micro_brain(
     )
     common_paths_mono_to_micro.to_csv(out_folder / "Enriched_paths_mono_to_micro.csv")
 
-    plot_pathway_network(
-        common_paths_mono_to_micro,
-        "Monocytes -> Microglia",
-        out_folder / "Net_paths_mono_to_micro.png",
-    )
 
     ## Microglia --> Monocytes
     mi2mo_factor = CELLS_FACTOR_DICT[design][cohort]["Micro_to_Mono"]
