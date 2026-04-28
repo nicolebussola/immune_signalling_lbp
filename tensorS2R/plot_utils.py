@@ -1,5 +1,11 @@
+import textwrap
+
+import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
 import pandas as pd
+from gseapy import enrichment_map
+from matplotlib.colors import Normalize
 from bokeh.models import (
     CDSView,
     ColorBar,
@@ -132,3 +138,11 @@ def interactive_embedding(
         p.add_layout(cb, "right")
         from bokeh.layouts import layout
         return layout([slider, p])
+
+
+def _nudge_positions(pos, x_shift=0, y_shift=0.07):
+    return {node: (x + x_shift, y + y_shift) for node, (x, y) in pos.items()}
+
+
+def _wrap_text(text, width=30):
+    return "\n".join(textwrap.wrap(text, width=width, break_long_words=False, break_on_hyphens=False))

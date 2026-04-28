@@ -6,28 +6,78 @@ End-to-end pipeline for ligand-receptor communication analysis using Tensor-cell
 
 ## Human pipeline
 
+The full pipeline runs three sequential steps. You can run all steps at once or each independently.
+
+### Run all steps
+
 ```bash
 python -m tensorS2R \
     -p <project_path> \
     -b <cohort_1|cohort_2> \
     -f <factorization_type> \
+    [--step <1|2|3|all>] \
     [-s <sample_key>] \
     [-g <groupby>] \
     [-m <merging_mode>] \
     [-r <rank>] \
-    [-d <cpu|cuda>]
+    [-d <cpu|cuda>] \
+    [-t <ora_threshold>]
 ```
 
 | Argument | Flag | Default | Description |
 |---|---|---|---|
-| `project_path` | `-p` | HPC path | Root directory where data are stored |
+| `project_path` | `-p` | — | Root directory where data are stored |
 | `cohort` | `-b` | — | `cohort_1` or `cohort_2` |
-| `factorization_type` | `-f` | — | See modes below |
+| `factorization_type` | `-f` | — | See modes below (required for steps 1 and 2) |
+| `step` | `--step` | `all` | `1`, `2`, `3`, or `all` |
 | `sample_key` | `-s` | `sample` | Patient column in `adata.obs` |
 | `groupby` | `-g` | `cell_type_coarse` | Cell-type column for LIANA predictions |
 | `merging_mode` | `-m` | `inner` | Sample merging mode for tensor construction |
-| `factorization_rank` | `-r` | auto (elbow) | Tensor rank; fixed at 20 when >7 cell types |
+| `factorization_rank` | `-r` | auto (elbow) | Tensor rank; required for `--step 2` when step 1 was run separately |
 | `device` | `-d` | `cuda` | `cuda` or `cpu` |
+| `threshold_targets` | `-t` | `0.1` | Top fraction of genes for ORA (step 3) |
+
+---
+
+## Pipeline steps
+
+### Step 1 — Tensor factorization
+
+```bash
+python -m tensorS2R.step1_factorize \
+    -p <project_path> -b <cohort> -f <factorization_type> [-s] [-g] [-m] [-r] [-d]
+```
+
+Runs LIANA rank-aggregate by sample then Tensor-cell2cell factorization. Writes all outputs (loadings, factor plots, network, Gini) to:
+
+```
+<project_path>/<cohort>/c2c_liana_outputs/<factorization_type>/rank_<r>/<merging_mode>/<groupby>/
+```
+
+### Step 2 — LR filtering and enrichment
+
+```bash
+python -m tensorS2R.step2_enrich \
+    -p <project_path> -b <cohort> -f <factorization_type> -r <rank> [-m] [-g]
+```
+
+Filters LR pairs from tensor loadings and runs Enrichr-based pathway enrichment. Dispatches based on cohort and design:
+
+- **All cohorts / all modes** — Monocyte↔Microglia enrichment
+- **Cohort 2 + `brain_coarse`** — also Neuron↔Microglia enrichment + pseudo-bulk product heatmaps
+- **Cohort 2 + `brain_blood_coarse`** — also Neuron↔Monocyte enrichment
+
+Factor numbers are configured in `CELLS_FACTOR_DICT` and `NEURO_FACTOR_DICT` at the top of `step2_enrich.py`. Update them when re-running factorization produces a different ordering.
+
+### Step 3 — ORA and LR product
+
+```bash
+python -m tensorS2R.step3_downstream \
+    -p <project_path> -b <cohort> [-t <threshold>] \
+    [-f <factorization_type> -r <rank> [-m <merging_mode>] [-g <groupby>]]
+```
+
+Runs pseudo-bulk ORA via decoupler on MSigDB gene sets (WikiPathways, Reactome, GO Biological Process). Produces boxplot/swarmplot figures per pathway and interactive UMAP embeddings coloured by ORA score. When `-f` is provided, also computes pseudo-bulk LR product heatmaps for the filtered Mono↔Micro LR pairs written by step 2 (`lr_loads_mono_to_micro_filtered.csv`, `lr_loads_micro_to_mono_filtered.csv`). Outputs go to `<project_path>/<cohort>/ora_outputs/`.
 
 ---
 
@@ -37,13 +87,18 @@ python -m tensorS2R \
 
 Uses brain AnnData only (both cell types present in brain data).
 
-**Step 1** (`factorization_run.py`): LIANA rank-aggregate by sample → Tensor-cell2cell factorization on brain cell types.
+**Step 1** (`step1_factorize.py`): LIANA rank-aggregate by sample → Tensor-cell2cell factorization on brain cell types.
 
-**Step 2** (`enrichment_run.py` → `enrich_mono_micro_brain`):
+**Step 2** (`step2_enrich.py` → `enrich_mono_micro_brain`):
 - Extract LR pairs from Mono→Micro and Micro→Mono factors
 - Filter ligands/receptors by differential expression on Microglia and Monocytes
 - Enrichment background: genes expressed in ≥10% of Microglia or Monocytes in brain data
 - Output: enriched pathways shared between ligand and receptor gene sets
+
+**Step 2 — Cohort 2 only** (`enrich_neuro_micro`):
+- Extract LR pairs from Neuron→Microglia (Factor 9) and Microglia→Neuron (Factor 10)
+- Filter neuron ligands by DE vs. OPC; microglia receptors by DE vs. non-microglial types
+- Enrichment + pseudo-bulk LR product heatmaps
 
 ---
 
@@ -51,9 +106,9 @@ Uses brain AnnData only (both cell types present in brain data).
 
 Uses a combined blood+microglia AnnData (microglia only from brain, `micro_only=True`).
 
-**Step 1** (`factorization_run.py`): LIANA rank-aggregate by sample → Tensor-cell2cell factorization on blood+microglia.
+**Step 1** (`step1_factorize.py`): LIANA rank-aggregate by sample → Tensor-cell2cell factorization on blood+microglia.
 
-**Step 2** (`enrichment_run.py` → `enrich_mono_micro_blood_micro`):
+**Step 2** (`step2_enrich.py` → `enrich_mono_micro_blood_micro`):
 - Requires pre-computed DEG AnnData (`blood_microglia_tf.h5ad`) in `c2c_liana_outputs/`
 - Filter ligands expressed on CD16/CD14 Monocytes in both blood and combined adatas
 - Filter receptors expressed on Microglia in brain data
@@ -65,12 +120,17 @@ Uses a combined blood+microglia AnnData (microglia only from brain, `micro_only=
 
 Uses the full combined blood+brain AnnData (`micro_only=False`).
 
-**Step 1** (`factorization_run.py`): LIANA rank-aggregate by sample → Tensor-cell2cell factorization on all blood and brain cell types.
+**Step 1** (`step1_factorize.py`): LIANA rank-aggregate by sample → Tensor-cell2cell factorization on all blood and brain cell types.
 
-**Step 2** (`enrichment_run.py` → `enrich_mono_micro_blood_brain`):
+**Step 2** (`step2_enrich.py` → `enrich_mono_micro_blood_brain`):
 - Requires pre-computed DEG AnnData (`blood_brain_tf.h5ad`) in `c2c_liana_outputs/`
 - Applies additional filtering based on receiver/sender cell context (brain vs. blood)
 - Enrichment background: genes expressed in ≥10% of Microglia (brain) or Monocytes (blood)
+
+**Step 2 — Cohort 2 only** (`enrich_neuro_mono`):
+- Extract LR pairs from Neuron→Monocyte (Factor 6) and Monocyte→Neuron (Factor 16)
+- Filter neuron ligands by DE across all three neuron references (GABAergic, Glutamatergic, Neuron-low count)
+- Filter monocyte receptors/ligands by DE in CD14 and CD16 monocytes vs. all other blood cell types
 
 ---
 
@@ -114,14 +174,15 @@ Cell-type columns available in `adata.obs` after loading:
 
 | File | Purpose |
 |---|---|
-| `__main__.py` | Human pipeline entry point — runs factorization then enrichment |
-| `factorization_run.py` | `run_tensorcell2cell()` — LIANA + Tensor-cell2cell (human) |
+| `__main__.py` | Human pipeline entry point — dispatches steps 1, 2, 3, or all |
+| `step1_factorize.py` | `run_tensorcell2cell()` — LIANA + Tensor-cell2cell (human) |
+| `step2_enrich.py` | `run_enrichment()` — LR filtering and Enrichr pathway enrichment (all modes) |
+| `step3_ora.py` | `main()` — pseudo-bulk ORA via decoupler on MSigDB gene sets |
 | `factorization_run_mouse.py` | `run_tensorcell2cell_mouse()` — LIANA mouse consensus + Tensor-cell2cell |
-| `enrichment_run.py` | Enrichment functions for each human factorization mode |
 | `adata_processing_utils.py` | Data loading, filtering, and preprocessing |
-| `lr_loadings_utils.py` | LR pair processing, DE filtering, enrichment utilities |
-| `ora_analysis.py` | Over-representation analysis (ORA) with decoupler |
-| `plot_utils.py` | Interactive Bokeh embedding plots |
+| `lr_loadings_utils.py` | LR pair processing, DE filtering, pseudo-bulk product, enrichment utilities |
+| `ora_analysis.py` | Legacy ORA module (superseded by `step3_ora.py`) |
+| `plot_utils.py` | Interactive Bokeh embedding plots; `plot_pathway_network` for enrichment maps |
 
 ---
 
@@ -141,6 +202,30 @@ Cell-type columns available in `adata.obs` after loading:
     enrichr_results/
         Enriched_paths_mono_to_micro.csv
         Enriched_paths_micro_to_mono.csv
+        Net_paths_mono_to_micro.png
+        Net_paths_micro_to_mono.png
+    [cohort_2 + brain_coarse only]
+    lr_loads_neuro_to_micro_filtered_9.csv
+    lr_loads_micro_to_neuro_filtered_10.csv
+    Enriched_paths_neuro_to_micro_9.csv
+    Enriched_paths_micro_to_neuro_10.csv
+    Net_paths_neuro_to_micro_9.png
+    Net_paths_micro_to_neuro_10.png
+    lr_product_neuro_to_micro_9.pdf
+    lr_product_micro_to_neuro_10.pdf
+    [cohort_2 + brain_blood_coarse only]
+    lr_loads_neuro_to_mono_filtered.csv
+    lr_loads_mono_to_neuro_filtered.csv
+    Enriched_paths_neuro_to_mono.csv
+    Enriched_paths_mono_to_neuro.csv
+    Net_paths_neuro_to_mono.png
+    Net_paths_mono_to_neuro.png
+
+<project_path>/<cohort>/ora_outputs/
+    pseudobulk_ora_<db>_<pathway>.pdf
+    [when -f is provided]
+    lr_product_mono_to_micro.pdf
+    lr_product_micro_to_mono.pdf
 ```
 
 **Mouse:**

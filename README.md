@@ -35,7 +35,7 @@ The paper makes four main contributions:
 immune_signalling_lbp/
 ├── preprocessing/          # Raw data processing: QC, filtering, normalization, annotation
 ├── PBICs_analysis/         # DE analysis, TF/pathway activity, compositional analysis, cross-dataset comparison
-├── tensorS2R/              # Tensor-S2R CCC pipeline (LIANA + Tensor-cell2cell + filtering + downstream analysos)
+├── tensorS2R/              # Tensor-S2R CCC pipeline (LIANA + Tensor-cell2cell + LR filtering + enrichment + downstream)
 ├── LBP_env.yml             # Conda environment
 └── pyproject.toml
 ```
@@ -73,33 +73,36 @@ See [`PBICs_analysis/README.md`](PBICs_analysis/README.md) for execution order a
 
 ### 3. Tensor-S2R communication pipeline (`tensorS2R/`)
 
-End-to-end ligand-receptor communication pipeline.
+End-to-end ligand-receptor communication pipeline structured as three sequential steps:
 
-The pipeline implements five steps:
-1. **Tensor decomposition** combining LIANA+ and Tensor-cell2cell 
-2. **LR pair filtering** — top 70th percentile loadings; ligands/receptors filtered by scran-based DE (preferentially expressed on sender/receiver vs. other cell types).
-3. **Pathway enrichment** — Enrichr (GSEApy) on filtered LR sets against WikiPathways, Reactome, and GO Biological Process; common pathways extracted.
-4. **Over-representation analysis (ORA)** — decoupleR ORA on common enriched pathways at cell and pseudo-bulk level.
-5. **Pseudo-bulk LR product** — mean pseudo-bulk expression of ligand in sender × receptor in receiver cells.
+| Step | Script | Description |
+|------|--------|-------------|
+| 1 | `step1_factorize.py` | LIANA+ rank-aggregate by sample → Tensor-cell2cell factorization |
+| 2 | `step2_enrich.py` | LR pair filtering (top 70th-percentile loadings; scran DE) → Enrichr pathway enrichment (WikiPathways, Reactome, GO) → pseudo-bulk LR product heatmaps |
+| 3 | `step3_downstream.py` | Pseudo-bulk ORA via decoupler on MSigDB gene sets at cell and pseudo-bulk level; optionally computes LR product heatmaps |
 
-**Human pipeline** — three analytical designs:
+Step 2 dispatches automatically based on cohort and design. For Cohort 2, it additionally runs Neuron↔Microglia (brain_coarse) and Neuron↔Monocyte (brain_blood_coarse) enrichment analyses.
+
+**Human pipeline** — analytical designs:
 
 | Mode | Data | Key interaction |
 |------|------|----------------|
-| `micro_blood_coarse` | Blood PBMCs + microglia (brain) | Monocytes ↔ Microglia |
 | `brain_coarse` | Brain only | Monocytes ↔ Microglia (brain) |
+| `micro_blood_coarse` | Blood PBMCs + microglia (brain) | Monocytes ↔ Microglia |
 | `brain_blood_coarse` | Full blood + all brain cell types | All PBICs ↔ all brain types |
 
 ```bash
 python -m tensorS2R \
     -p <project_path> \
     -b <cohort_1|cohort_2> \
-    -f <micro_blood_coarse|brain_coarse|brain_blood_coarse> \
+    -f <brain_coarse|micro_blood_coarse|brain_blood_coarse> \
+    [--step <1|2|3|all>] \
     [-s <sample_key>] \
     [-g <groupby>] \
     [-m <inner|outer>] \
     [-r <rank>] \
-    [-d <cuda|cpu>]
+    [-d <cuda|cpu>] \
+    [-t <ora_threshold>]
 ```
 
 **Mouse pipeline** (`factorization_run_mouse.py`) — LIANA mouse consensus + Tensor-cell2cell on the GEO GSE225948 paired brain/blood dataset (sham, D02, D14 conditions; rank fixed at 20):
