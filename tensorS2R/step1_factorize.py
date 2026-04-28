@@ -59,11 +59,17 @@ def run_tensorcell2cell(
         tl.set_backend("pytorch")
 
     if factorization_type == "micro_blood_coarse":
-        adata = create_blood_brain_tf(cohort, project_path, write=False, micro_only=True)
+        adata = create_blood_brain_tf(
+            cohort, project_path, write=False, micro_only=True
+        )
     elif factorization_type == "brain_blood_coarse":
-        adata = create_blood_brain_tf(cohort, project_path, write=False, micro_only=False)
+        adata = create_blood_brain_tf(
+            cohort, project_path, write=False, micro_only=False
+        )
         adata.obs["cell_type.v3"] = (
-            adata.obs["cell_type_coarse"].astype(str) + "_" + adata.obs["tissue"].astype(str)
+            adata.obs["cell_type_coarse"].astype(str)
+            + "_"
+            + adata.obs["tissue"].astype(str)
         )
         adata.obs["cell_type.v4"] = (
             adata.obs["cell_type"].astype(str) + "_" + adata.obs["tissue"].astype(str)
@@ -194,7 +200,9 @@ def run_tensorcell2cell(
 
     factors = c2c.io.load_tensor_factors(output_folder / "Loadings.xlsx")
 
-    version_colors = c2c.plotting.aesthetics.get_colors_from_labels(["v3", "v2"], cmap="plasma")
+    version_colors = c2c.plotting.aesthetics.get_colors_from_labels(
+        ["v3", "v2"], cmap="plasma"
+    )
     color_dict = {k: version_colors[v] for k, v in context_dict.items()}
     col_colors = pd.Series(color_dict).to_frame()
     col_colors.columns = ["Chemistry"]
@@ -230,15 +238,21 @@ def run_tensorcell2cell(
         row_cluster=False,
     )
 
-    for selected_factor in tqdm(factors["Contexts"].columns.tolist(), desc="Factor loading plots"):
+    for selected_factor in tqdm(
+        factors["Contexts"].columns.tolist(), desc="Factor loading plots"
+    ):
         loading_product = c2c.analysis.tensor_downstream.get_joint_loadings(
-            factors, dim1="Sender Cells", dim2="Receiver Cells", factor=selected_factor,
+            factors,
+            dim1="Sender Cells",
+            dim2="Receiver Cells",
+            factor=selected_factor,
         )
         c2c.plotting.loading_clustermap(
             loading_product.T,
             use_zscore=False,
             figsize=(8, 8),
-            filename=output_folder / f"Clustermap_CC_{selected_factor.replace(' ', '-')}.pdf",
+            filename=output_folder
+            / f"Clustermap_CC_{selected_factor.replace(' ', '-')}.pdf",
             cbar_label="Loading Product",
         )
         lr_cell_product = c2c.analysis.tensor_downstream.get_lr_by_cell_pairs(
@@ -255,7 +269,8 @@ def run_tensorcell2cell(
             lr_cell_product,
             use_zscore=False,
             figsize=(15, 24),
-            filename=output_folder / f"Clustermap_LR-CC_{selected_factor.replace(' ', '-')}.pdf",
+            filename=output_folder
+            / f"Clustermap_LR-CC_{selected_factor.replace(' ', '-')}.pdf",
             cbar_label="Loading Product",
             yticklabels=1,
         )
@@ -279,13 +294,25 @@ def run_tensorcell2cell(
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Step 1: Tensor factorization (LIANA + Tensor-cell2cell)")
-    parser.add_argument("-p", "--project_path", required=True, help="Root data directory")
-    parser.add_argument("-b", "--cohort", required=True, choices=["cohort_1", "cohort_2"])
-    parser.add_argument("-s", "--sample_key", default="sample", help="Patient column in adata.obs")
-    parser.add_argument("-g", "--groupby", default="cell_type_coarse", help="Cell-type column for LIANA")
+    parser = argparse.ArgumentParser(
+        description="Step 1: Tensor factorization (LIANA + Tensor-cell2cell)"
+    )
     parser.add_argument(
-        "-f", "--factorization_type", required=True,
+        "-p", "--project_path", required=True, help="Root data directory"
+    )
+    parser.add_argument(
+        "-b", "--cohort", required=True, choices=["cohort_1", "cohort_2"]
+    )
+    parser.add_argument(
+        "-s", "--sample_key", default="sample", help="Patient column in adata.obs"
+    )
+    parser.add_argument(
+        "-g", "--groupby", default="cell_type_coarse", help="Cell-type column for LIANA"
+    )
+    parser.add_argument(
+        "-f",
+        "--factorization_type",
+        required=True,
         choices=["brain_coarse", "micro_blood_coarse", "brain_blood_coarse"],
     )
     parser.add_argument("-m", "--merging_mode", default="inner")
