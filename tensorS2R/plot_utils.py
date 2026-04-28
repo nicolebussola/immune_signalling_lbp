@@ -146,3 +146,93 @@ def _nudge_positions(pos, x_shift=0, y_shift=0.07):
 
 def _wrap_text(text, width=30):
     return "\n".join(textwrap.wrap(text, width=width, break_long_words=False, break_on_hyphens=False))
+
+
+def _extract_ora_df(pdata, db_name, source_label):
+    """
+    Extract ORA estimates from pdata into a tidy DataFrame.
+
+    Parameters:
+    pdata (AnnData): Pseudo-bulk AnnData with ora_estimate_{db_name} in obsm.
+    db_name (str): Database key.
+    source_label (str): Label added as 'Source' column (e.g. 'Brain (Cohort 1)').
+
+    Returns:
+    pd.DataFrame with columns: pathway scores + 'cell_t' + 'Source'.
+    """
+    df = pdata.obsm[f"ora_estimate_{db_name}"].copy()
+    df.index = df.index.str.replace("Astrocytes", "Astrocyte", regex=False)
+    df["cell_t"] = [x.split("_")[1] if "_" in x else x for x in df.index]
+    df = df[~df.index.str.contains("nan", na=False)]
+    df["Source"] = source_label
+    return df
+
+def plot_pseudobulk_ora(sources, db_name, paths, out_folder):
+    """
+    Boxplot + swarmplot of pseudo-bulk ORA estimates for selected pathways.
+
+    Parameters:
+    sources (list of tuple): Each entry is (label, pdata) where label is a
+        key in SOURCE_PALETTE (e.g. 'Brain (Cohort 1)').
+    db_name (str): Database key ('wikipathways', 'reactome', or 'go').
+    paths (list): Pathway names to plot.
+    out_folder (Path): Directory to save figures.
+    """
+    dfs = [_extract_ora_df(pdata, db_name, label) for label, pdata in sources]
+    combined_df = pd.concat(dfs, ignore_index=True)
+
+    available = [p for p in paths if p in combined_df.columns]
+    if not available:
+        print(f"No matching pathways found in {db_name} ORA results — skipping plot.")
+        return
+
+    palette = {k: v for k, v in SOURCE_PALETTE.items() if k in combined_df["Source"].unique()}
+
+    for pathway in available:
+        fig, ax = plt.subplots(figsize=(max(8, combined_df["cell_t"].nunique() * 1.5), 4))
+
+        sns.boxplot(
+            data=combined_df, x="cell_t", y=pathway, hue="Source", palette=palette, ax=ax,
+        )
+        sns.swarmplot(
+            data=combined_df, x="cell_t", y=pathway, hue="Source", palette=palette,
+            size=3, dodge=True, edgecolor="#444445", linewidth=1, alpha=0.8,
+            legend=False, ax=ax,
+        )
+
+        cell_types = combined_df["cell_t"].unique()
+        for i in range(1, len(cell_types)):
+            ax.axvline(i - 0.5, color="black", linestyle="--", linewidth=0.3)
+
+        ax.set_title(pathway, fontsize=10)
+        ax.set_xlabel("")
+        ax.set_ylabel("ORA score")
+        ax.tick_params(axis="x", rotation=0, labelsize=12)
+        ax.legend(loc="upper right", fontsize=12, bbox_to_anchor=(1.2, 0.5))
+
+        plt.tight_layout()
+        safe_name = pathway[:60].replace("/", "_")
+        fig.savefig(out_folder / f"pseudobulk_ora_{db_name}_{safe_name}.pdf", bbox_inches="tight")
+        plt.close(fig)
+
+
+def plot_prod_dict(prod_dict, out_file, figsize=(12, 9), cmap="BuPu"):
+    """
+    Plot LR product expression as a heatmap (cell types × LR pairs).
+
+    Parameters:
+    prod_dict (dict): {lr_pair: {cell_type: value}} from compute_prod_dict.
+    out_file (str or Path): Output file path.
+    figsize (tuple): Figure size. Default (12, 9).
+    cmap (str): Colormap. Default "BuPu".
+    """
+    df = pd.DataFrame(prod_dict)
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.heatmap(df, cmap=cmap, ax=ax)
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=30, ha="right", fontsize=14)
+    ax.set_yticklabels(ax.get_yticklabels(), rotation=90, fontsize=18)
+    cbar = ax.collections[0].colorbar
+    cbar.ax.tick_params(labelsize=14)
+    plt.tight_layout()
+    plt.savefig(out_file)
+    plt.close(fig)

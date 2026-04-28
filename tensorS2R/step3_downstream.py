@@ -18,18 +18,19 @@ import argparse
 from pathlib import Path
 
 import decoupler as dc
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scanpy as sc
-import seaborn as sns
 from bokeh.palettes import Inferno256
 from bokeh.plotting import show
 
-from .adata_processing_utils import cell_type_mapping, filter_adata, load_brain_blood_data
-from .lr_loadings_utils import compute_prod_dict, get_mean_expression, plot_prod_dict
-from .plot_utils import interactive_embedding
-
+from .adata_processing_utils import (
+    cell_type_mapping,
+    filter_adata,
+    load_brain_blood_data,
+)
+from .lr_loadings_utils import compute_prod_dict, get_mean_expression
+from .plot_utils import interactive_embedding, plot_prod_dict, plot_pseudobulk_ora
 
 msigdb = dc.get_resource("MSigDB")
 
@@ -103,26 +104,6 @@ def _get_acts_clipped(adata, db_name):
     return acts
 
 
-def _extract_ora_df(pdata, db_name, source_label):
-    """
-    Extract ORA estimates from pdata into a tidy DataFrame.
-
-    Parameters:
-    pdata (AnnData): Pseudo-bulk AnnData with ora_estimate_{db_name} in obsm.
-    db_name (str): Database key.
-    source_label (str): Label added as 'Source' column (e.g. 'Brain (Cohort 1)').
-
-    Returns:
-    pd.DataFrame with columns: pathway scores + 'cell_t' + 'Source'.
-    """
-    df = pdata.obsm[f"ora_estimate_{db_name}"].copy()
-    df.index = df.index.str.replace("Astrocytes", "Astrocyte", regex=False)
-    df["cell_t"] = [x.split("_")[1] if "_" in x else x for x in df.index]
-    df = df[~df.index.str.contains("nan", na=False)]
-    df["Source"] = source_label
-    return df
-
-
 def ora_pseudobulk(project_path, cohort, threshold_targets):
     """
     Compute pseudo-bulk ORA for brain and blood across all three databases.
@@ -148,7 +129,10 @@ def ora_pseudobulk(project_path, cohort, threshold_targets):
 
     for adata in [adata_br, adata_bl]:
         adata.obs["cell_type.v2"] = (
-            adata.obs["cell_type"].astype(str).replace(cell_type_mapping).astype("category")
+            adata.obs["cell_type"]
+            .astype(str)
+            .replace(cell_type_mapping)
+            .astype("category")
         )
 
     pdata_br = dc.get_pseudobulk(
@@ -176,56 +160,9 @@ def ora_pseudobulk(project_path, cohort, threshold_targets):
     return pdata_br, pdata_bl
 
 
-def plot_pseudobulk_ora(sources, db_name, paths, out_folder):
-    """
-    Boxplot + swarmplot of pseudo-bulk ORA estimates for selected pathways.
-
-    Parameters:
-    sources (list of tuple): Each entry is (label, pdata) where label is a
-        key in SOURCE_PALETTE (e.g. 'Brain (Cohort 1)').
-    db_name (str): Database key ('wikipathways', 'reactome', or 'go').
-    paths (list): Pathway names to plot.
-    out_folder (Path): Directory to save figures.
-    """
-    dfs = [_extract_ora_df(pdata, db_name, label) for label, pdata in sources]
-    combined_df = pd.concat(dfs, ignore_index=True)
-
-    available = [p for p in paths if p in combined_df.columns]
-    if not available:
-        print(f"No matching pathways found in {db_name} ORA results — skipping plot.")
-        return
-
-    palette = {k: v for k, v in SOURCE_PALETTE.items() if k in combined_df["Source"].unique()}
-
-    for pathway in available:
-        fig, ax = plt.subplots(figsize=(max(8, combined_df["cell_t"].nunique() * 1.5), 4))
-
-        sns.boxplot(
-            data=combined_df, x="cell_t", y=pathway, hue="Source", palette=palette, ax=ax,
-        )
-        sns.swarmplot(
-            data=combined_df, x="cell_t", y=pathway, hue="Source", palette=palette,
-            size=3, dodge=True, edgecolor="#444445", linewidth=1, alpha=0.8,
-            legend=False, ax=ax,
-        )
-
-        cell_types = combined_df["cell_t"].unique()
-        for i in range(1, len(cell_types)):
-            ax.axvline(i - 0.5, color="black", linestyle="--", linewidth=0.3)
-
-        ax.set_title(pathway, fontsize=10)
-        ax.set_xlabel("")
-        ax.set_ylabel("ORA score")
-        ax.tick_params(axis="x", rotation=0, labelsize=12)
-        ax.legend(loc="upper right", fontsize=12, bbox_to_anchor=(1.2, 0.5))
-
-        plt.tight_layout()
-        safe_name = pathway[:60].replace("/", "_")
-        fig.savefig(out_folder / f"pseudobulk_ora_{db_name}_{safe_name}.pdf", bbox_inches="tight")
-        plt.close(fig)
-
-
-def compute_lr_products(project_path, cohort, loadings_folder, factorization_type, out_folder):
+def compute_lr_products(
+    project_path, cohort, loadings_folder, factorization_type, out_folder
+):
     """
     Compute and save pseudo-bulk LR product heatmaps for filtered LR pairs from step 2.
 
@@ -246,8 +183,13 @@ def compute_lr_products(project_path, cohort, loadings_folder, factorization_typ
 
     adata_br = sc.read(cohort_liana_path / "data_brain_scran_de_micro_mono.h5ad")
     pdata_br = dc.get_pseudobulk(
-        adata_br, sample_col="pt", groups_col=celltype_col,
-        layer="counts", mode="sum", min_cells=10, min_counts=10000,
+        adata_br,
+        sample_col="pt",
+        groups_col=celltype_col,
+        layer="counts",
+        mode="sum",
+        min_cells=10,
+        min_counts=10000,
     )
     df_micro = get_mean_expression(pdata_br, "Microglia", celltype_col)
 
@@ -258,16 +200,19 @@ def compute_lr_products(project_path, cohort, loadings_folder, factorization_typ
         # monocytes (non-reference senders/receivers) are in blood
         adata_bl = sc.read(cohort_liana_path / "data_blood_scran_de_micro_mono.h5ad")
         pdata_nonref = dc.get_pseudobulk(
-            adata_bl, sample_col="pt", groups_col=celltype_col,
-            layer="counts", mode="sum", min_cells=10, min_counts=10000,
+            adata_bl,
+            sample_col="pt",
+            groups_col=celltype_col,
+            layer="counts",
+            mode="sum",
+            min_cells=10,
+            min_counts=10000,
         )
 
-    # (csv_filename, is_ligand, output_filename)
-    # is_ligand=True:  Microglia sends ligand; non-reference cells receive receptor
-    # is_ligand=False: Microglia receives receptor; non-reference cells send ligand
+    # Mono↔Micro: is_ligand=True → Microglia sends; is_ligand=False → Microglia receives
     lr_files = [
         ("lr_loads_mono_to_micro_filtered.csv", False, "lr_product_mono_to_micro.pdf"),
-        ("lr_loads_micro_to_mono_filtered.csv", True,  "lr_product_micro_to_mono.pdf"),
+        ("lr_loads_micro_to_mono_filtered.csv", True, "lr_product_micro_to_mono.pdf"),
     ]
     for csv_name, is_ligand, out_name in lr_files:
         csv_path = Path(loadings_folder) / csv_name
@@ -277,13 +222,51 @@ def compute_lr_products(project_path, cohort, loadings_folder, factorization_typ
         lr_df = pd.read_csv(csv_path)
         lr_pairs = (lr_df["ligand"] + "^" + lr_df["receptor"]).tolist()
         prod_dict = compute_prod_dict(
-            lr_pairs, pdata_nonref, df_micro, celltype_col,
-            reference_cell="Microglia", is_ligand=is_ligand,
+            lr_pairs,
+            pdata_nonref,
+            df_micro,
+            celltype_col,
+            reference_cell="Microglia",
+            is_ligand=is_ligand,
         )
         plot_prod_dict(prod_dict, str(out_folder / out_name))
 
+    # Neuro↔Micro (brain_coarse only; factor number is embedded in the CSV filename)
+    neuro_micro_pairs = [
+        (
+            "lr_loads_neuro_to_micro_filtered_*.csv",
+            False,
+            "lr_product_neuro_to_micro_{}.pdf",
+        ),
+        (
+            "lr_loads_micro_to_neuro_filtered_*.csv",
+            True,
+            "lr_product_micro_to_neuro_{}.pdf",
+        ),
+    ]
+    for pattern, is_ligand, out_template in neuro_micro_pairs:
+        for csv_path in sorted(Path(loadings_folder).glob(pattern)):
+            factor = csv_path.stem.rsplit("_", 1)[-1]
+            lr_df = pd.read_csv(csv_path)
+            lr_pairs = (lr_df["ligand"] + "^" + lr_df["receptor"]).tolist()
+            prod_dict = compute_prod_dict(
+                lr_pairs,
+                pdata_br,
+                df_micro,
+                celltype_col,
+                reference_cell="Microglia",
+                is_ligand=is_ligand,
+            )
+            plot_prod_dict(prod_dict, str(out_folder / out_template.format(factor)))
 
-def main(project_path, cohort, threshold_targets, loadings_folder=None, factorization_type=None):
+
+def main(
+    project_path,
+    cohort,
+    threshold_targets,
+    loadings_folder=None,
+    factorization_type=None,
+):
 
     project_path = Path(project_path)
     out_folder = project_path / cohort / "ora_outputs"
@@ -319,8 +302,16 @@ def main(project_path, cohort, threshold_targets, loadings_folder=None, factoriz
                 continue
             acts_br.obs[path] = acts_br.obsm[f"ora_estimate_{db_name}"][path]
             acts_bl.obs[path] = acts_bl.obsm[f"ora_estimate_{db_name}"][path]
-            show(interactive_embedding(acts_br, label=path, palette_cont=Inferno256, title_font_size="20px"))
-            show(interactive_embedding(acts_bl, label=path, palette_cont=Inferno256, title_font_size="20px"))
+            show(
+                interactive_embedding(
+                    acts_br, label=path, palette_cont=Inferno256, title_font_size="20px"
+                )
+            )
+            show(
+                interactive_embedding(
+                    acts_bl, label=path, palette_cont=Inferno256, title_font_size="20px"
+                )
+            )
 
     # --- Pseudo-bulk ORA + boxplots ---
     cohort_label = "Cohort 1" if cohort == "cohort_1" else "Cohort 2"
@@ -334,25 +325,40 @@ def main(project_path, cohort, threshold_targets, loadings_folder=None, factoriz
         plot_pseudobulk_ora(sources, db_name, PATH_LISTS[db_name], out_folder)
 
     if loadings_folder is not None and factorization_type is not None:
-        compute_lr_products(project_path, cohort, loadings_folder, factorization_type, out_folder)
+        compute_lr_products(
+            project_path, cohort, loadings_folder, factorization_type, out_folder
+        )
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Step 3: ORA and pseudo-bulk LR product")
-    parser.add_argument("-p", "--project_path", required=True, help="Root data directory")
-    parser.add_argument("-b", "--cohort", required=True, choices=["cohort_1", "cohort_2"])
+    parser = argparse.ArgumentParser(
+        description="Step 3: ORA and pseudo-bulk LR product"
+    )
     parser.add_argument(
-        "-t", "--threshold_targets", type=float, default=0.1,
+        "-p", "--project_path", required=True, help="Root data directory"
+    )
+    parser.add_argument(
+        "-b", "--cohort", required=True, choices=["cohort_1", "cohort_2"]
+    )
+    parser.add_argument(
+        "-t",
+        "--threshold_targets",
+        type=float,
+        default=0.1,
         help="Top fraction of genes for ORA (default: 0.1 = top 10%%)",
     )
     parser.add_argument(
-        "-f", "--factorization_type",
+        "-f",
+        "--factorization_type",
         choices=["brain_coarse", "micro_blood_coarse", "brain_blood_coarse"],
         default=None,
         help="Factorization type; required for LR product heatmaps",
     )
     parser.add_argument(
-        "-r", "--factorization_rank", type=int, default=20,
+        "-r",
+        "--factorization_rank",
+        type=int,
+        default=20,
         help="Tensor rank used in step 1 (default: 20)",
     )
     parser.add_argument("-m", "--merging_mode", default="inner")
@@ -363,11 +369,19 @@ if __name__ == "__main__":
     loadings_folder = None
     if args.factorization_type is not None:
         loadings_folder = (
-            project_path / args.cohort / "c2c_liana_outputs"
+            project_path
+            / args.cohort
+            / "c2c_liana_outputs"
             / args.factorization_type
             / f"rank_{args.factorization_rank}"
             / args.merging_mode
             / args.groupby
         )
 
-    main(args.project_path, args.cohort, args.threshold_targets, loadings_folder, args.factorization_type)
+    main(
+        args.project_path,
+        args.cohort,
+        args.threshold_targets,
+        loadings_folder,
+        args.factorization_type,
+    )

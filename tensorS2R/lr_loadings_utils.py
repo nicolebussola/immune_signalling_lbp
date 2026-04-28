@@ -479,27 +479,6 @@ def compute_prod_dict(lr_pairs, pdata, df_ref, celltype_col, is_ligand=True, sam
     return prod_dict
 
 
-def plot_prod_dict(prod_dict, out_file, figsize=(12, 9), cmap="BuPu"):
-    """
-    Plot LR product expression as a heatmap (cell types × LR pairs).
-
-    Parameters:
-    prod_dict (dict): {lr_pair: {cell_type: value}} from compute_prod_dict.
-    out_file (str or Path): Output file path.
-    figsize (tuple): Figure size. Default (12, 9).
-    cmap (str): Colormap. Default "BuPu".
-    """
-    df = pd.DataFrame(prod_dict)
-    fig, ax = plt.subplots(figsize=figsize)
-    sns.heatmap(df, cmap=cmap, ax=ax)
-    ax.set_xticklabels(ax.get_xticklabels(), rotation=30, ha="right", fontsize=14)
-    ax.set_yticklabels(ax.get_yticklabels(), rotation=90, fontsize=18)
-    cbar = ax.collections[0].colorbar
-    cbar.ax.tick_params(labelsize=14)
-    plt.tight_layout()
-    plt.savefig(out_file)
-    plt.close(fig)
-
 
 def enr_df(gset, gene_set, background, out_path, organism="human"):
     """
