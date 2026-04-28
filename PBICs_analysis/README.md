@@ -48,20 +48,12 @@ Expected mouse metadata used by the script:
 
 Primary outputs written to the working directory:
 - human:
-  - `df_cd14_dreamlet.csv`
-  - `df_cd16_dreamlet.csv`
-  - `df_cd4_dreamlet.csv`
-  - `df_cd8_dreamlet.csv`
-  - `df_nk_dreamlet.csv`
-  - `df_bc_dreamlet.csv`
-  - `mat_cd14_dreamlet.csv`
+  - `df_<PBIC>_dreamlet.csv` for every PBIC
+  - `mat_<PBIC>_dreamlet.csv` for every PBIC
   - `mat_cd16_dreamlet.csv`
-  - `mat_cd4_dreamlet.csv`
-  - `mat_cd8_dreamlet.csv`
-  - `mat_nk_dreamlet.csv`
-  - `mat_bc_dreamlet.csv`
+
 - mouse:
-  - `df_cd14_dreamlet_mouse.csv`
+  - `df_cd14_dreamlet_mouse.csv` 
   - `df_cd4_dreamlet_mouse.csv`
   - `df_cd8_dreamlet_mouse.csv`
   - `df_bc_dreamlet_mouse.csv`
@@ -75,23 +67,13 @@ Notes:
 Transcription factor (TF) [3] and pathway activity analysis [4] using DEA outputs from `DEA_dreamlet.R`.
 
 Required inputs in the working directory:
-- `df_cd14_dreamlet.csv`
-- `df_cd16_dreamlet.csv`
-- `df_cd4_dreamlet.csv`
-- `df_cd8_dreamlet.csv`
-- `df_nk_dreamlet.csv`
-- `df_bc_dreamlet.csv`
-- `mat_cd14_dreamlet.csv`
-- `mat_cd16_dreamlet.csv`
-- `mat_cd4_dreamlet.csv`
-- `mat_cd8_dreamlet.csv`
-- `mat_nk_dreamlet.csv`
-- `mat_bc_dreamlet.csv`
+  - `df_<PBIC>_dreamlet.csv` for every PBIC
+  - `mat_<PBIC>_dreamlet.csv` for every PBIC
 
 Outputs:
-- `figures/CD14_volcano.pdf`
-- `figures/collectri_heatmap_bq.png`
-- `figures/progeny_heatmap_human_subset.png`
+  - `figures/<PBIC>_volcano.pdf`
+  - `figures/collectri_heatmap_bq.png`
+  - `figures/progeny_heatmap_human_subset.png`
 
 
 ### 4. `signature_comparison.r`
@@ -100,12 +82,8 @@ Cross-dataset signature comparison using dreamlet outputs from `DEA_dreamlet.R`,
 
 Required local dreamlet inputs in the working directory:
 - human:
-  - `df_cd14_dreamlet.csv`
-  - `df_cd16_dreamlet.csv`
-  - `df_cd4_dreamlet.csv`
-  - `df_cd8_dreamlet.csv`
-  - `df_nk_dreamlet.csv`
-  - `df_bc_dreamlet.csv`
+  - `df_<PBIC>_dreamlet.csv` for every PBIC
+  
 - mouse:
   - `df_cd14_dreamlet_mouse.csv`
   - `df_cd4_dreamlet_mouse.csv`
