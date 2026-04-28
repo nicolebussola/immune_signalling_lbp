@@ -64,7 +64,7 @@ python -m tensorS2R.step2_enrich \
 Filters LR pairs from tensor loadings and runs Enrichr-based pathway enrichment. Dispatches based on cohort and design:
 
 - **All cohorts / all modes** — Monocyte↔Microglia enrichment
-- **Cohort 2 + `brain_coarse`** — also Neuron↔Microglia enrichment + pseudo-bulk product heatmaps
+- **Cohort 2 + `brain_coarse`** — also Neuron↔Microglia enrichment
 - **Cohort 2 + `brain_blood_coarse`** — also Neuron↔Monocyte enrichment
 
 Factor numbers are configured in `CELLS_FACTOR_DICT` and `NEURO_FACTOR_DICT` at the top of `step2_enrich.py`. Update them when re-running factorization produces a different ordering.
@@ -98,7 +98,7 @@ Uses brain AnnData only (both cell types present in brain data).
 **Step 2 — Cohort 2 only** (`enrich_neuro_micro`):
 - Extract LR pairs from Neuron→Microglia (Factor 9) and Microglia→Neuron (Factor 10)
 - Filter neuron ligands by DE vs. OPC; microglia receptors by DE vs. non-microglial types
-- Enrichment + pseudo-bulk LR product heatmaps
+- Enrichment (LR product heatmaps computed in step 3)
 
 ---
 
@@ -211,8 +211,6 @@ Cell-type columns available in `adata.obs` after loading:
     Enriched_paths_micro_to_neuro_10.csv
     Net_paths_neuro_to_micro_9.png
     Net_paths_micro_to_neuro_10.png
-    lr_product_neuro_to_micro_9.pdf
-    lr_product_micro_to_neuro_10.pdf
     [cohort_2 + brain_blood_coarse only]
     lr_loads_neuro_to_mono_filtered.csv
     lr_loads_mono_to_neuro_filtered.csv
@@ -226,6 +224,9 @@ Cell-type columns available in `adata.obs` after loading:
     [when -f is provided]
     lr_product_mono_to_micro.pdf
     lr_product_micro_to_mono.pdf
+    [when -f brain_coarse + cohort_2]
+    lr_product_neuro_to_micro_<factor>.pdf
+    lr_product_micro_to_neuro_<factor>.pdf
 ```
 
 **Mouse:**
