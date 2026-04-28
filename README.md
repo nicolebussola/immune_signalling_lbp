@@ -85,9 +85,9 @@ Step 2 dispatches automatically based on cohort and design. For Cohort 2, it add
 
 **Human pipeline** — analytical designs:
 
-| Mode | Data | Key interaction |
+| Mode | Data | Key interactions |
 |------|------|----------------|
-| `brain_coarse` | Brain only | Monocytes ↔ Microglia (brain) |
+| `brain_coarse` | Brain only | Monocytes ↔ Microglia, Neurons ↔ Microglia |
 | `micro_blood_coarse` | Blood PBMCs + microglia (brain) | Monocytes ↔ Microglia |
 | `brain_blood_coarse` | Full blood + all brain cell types | All PBICs ↔ all brain types |
 
